@@ -12,7 +12,7 @@ export async function register(name: string, email: string, password: string) {
     [name, email, hashed]
   );
   const user = result.rows[0];
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' });
+  const token = jwt.sign({ userId: user.id, user: { id: user.id, name: user.name, email: user.email } }, process.env.JWT_SECRET!, { expiresIn: '7d' });
   return { user, token };
 }
 
@@ -24,7 +24,7 @@ export async function login(email: string, password: string) {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error('Invalid credentials');
 
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' });
+  const token = jwt.sign({ userId: user.id, user: { id: user.id, name: user.name, email: user.email } }, process.env.JWT_SECRET!, { expiresIn: '7d' });
   const { password: _, ...safeUser } = user;
   return { user: safeUser, token };
 }
