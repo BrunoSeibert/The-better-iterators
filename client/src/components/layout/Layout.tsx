@@ -7,6 +7,7 @@ import {
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
 import studyonLogo from '@/assets/Studyon_Logo.png';
+import { useAuthStore } from '@/store/authStore';
 
 const levels = Array.from({ length: 8 }, (_, index) => index + 1);
 const unlockedLevel = 5;
@@ -15,6 +16,7 @@ export default function Layout() {
   const [activeLevel, setActiveLevel] = useState(1);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -96,6 +98,19 @@ export default function Layout() {
           alt="Studyon logo"
           className="h-14 w-14 object-contain brightness-0 invert"
         />
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => { logout(); navigate('/login'); }}
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+            aria-label="Logout"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
+              <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm-1-9H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3h-2v3H5V6h10v3h2V6a2 2 0 0 0-2-2z"/>
+            </svg>
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/streak')}
