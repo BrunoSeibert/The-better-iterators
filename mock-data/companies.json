@@ -1,0 +1,122 @@
+[
+  {
+    "id": "company-01",
+    "name": "Nestlé",
+    "description": "The world's largest food and beverage company, headquartered in Vevey, Switzerland. Nestlé operates in nutrition, health and wellness across 188 countries.",
+    "about": "Nestlé actively collaborates with Swiss universities on research topics spanning supply chain sustainability, AI-driven quality assurance, consumer nutrition science, and packaging innovation. We offer thesis students access to real production data, mentorship from R&D professionals, and potential pathways into graduate programs.",
+    "size": "10001+",
+    "domains": ["Consumer Goods", "Food & Beverage"]
+  },
+  {
+    "id": "company-02",
+    "name": "Roche",
+    "description": "A global pioneer in pharmaceuticals and diagnostics, based in Basel. Roche focuses on advancing science to improve people's lives through innovative medicines and diagnostic tests.",
+    "about": "Roche partners with universities across Switzerland to advance research in computational biology, personalized medicine, clinical trial design, and digital health. Thesis students can work alongside scientists at our Basel innovation campus, with access to anonymized clinical datasets and cutting-edge lab infrastructure.",
+    "size": "10001+",
+    "domains": ["Pharma & Healthcare", "Biotechnology"]
+  },
+  {
+    "id": "company-03",
+    "name": "ABB",
+    "description": "A leading global technology company that energizes the transformation of society and industry. ABB operates in electrification, robotics, automation and motion from its headquarters in Zurich.",
+    "about": "ABB offers thesis opportunities in robotics, industrial IoT, energy management, and smart manufacturing. Students work on real engineering challenges with access to ABB's research centers and test facilities in Switzerland. We value interdisciplinary thinkers who can bridge hardware and software.",
+    "size": "10001+",
+    "domains": ["Industrial Technology", "Energy"]
+  },
+  {
+    "id": "company-04",
+    "name": "Swisscom",
+    "description": "Switzerland's leading telecommunications provider, offering mobile, internet, and IT services. Swisscom also drives digital transformation for enterprise customers.",
+    "about": "Swisscom collaborates with universities on topics including network optimization, AI for customer experience, cybersecurity, and 5G applications. Thesis students get access to anonymized network data and can work embedded in our engineering teams in Bern or Zurich.",
+    "size": "5001-10000",
+    "domains": ["Telecommunications", "IT Services"]
+  },
+  {
+    "id": "company-05",
+    "name": "SBB",
+    "description": "The Swiss Federal Railways, one of the densest and most punctual rail networks in the world. SBB transports over a million passengers daily and is a major logistics operator.",
+    "about": "SBB supports thesis research in predictive maintenance, passenger flow optimization, sustainability in transport, and AI for operations. We offer access to real ridership and infrastructure data, making us an ideal partner for students interested in data-driven transportation solutions.",
+    "size": "10001+",
+    "domains": ["Transportation", "Logistics"]
+  },
+  {
+    "id": "company-06",
+    "name": "Swiss Re",
+    "description": "One of the world's leading reinsurers, headquartered in Zurich. Swiss Re provides risk knowledge and financial solutions to insurance companies, corporations and the public sector.",
+    "about": "Swiss Re welcomes thesis students working on climate risk modeling, catastrophe analytics, actuarial innovation, and ESG quantification. Our data science teams can provide mentorship and access to proprietary risk datasets for academic research purposes.",
+    "size": "5001-10000",
+    "domains": ["Insurance", "Financial Services"]
+  },
+  {
+    "id": "company-07",
+    "name": "Zurich Insurance",
+    "description": "A leading multi-line insurer serving customers in global and local markets. Zurich Insurance provides a range of property, casualty and life insurance products and services.",
+    "about": null,
+    "size": "10001+",
+    "domains": ["Insurance", "Financial Services"]
+  },
+  {
+    "id": "company-08",
+    "name": "Novartis",
+    "description": "A global healthcare company based in Basel, focused on innovative medicines. Novartis reimagines medicine to improve and extend people's lives through breakthrough treatments.",
+    "about": "Novartis partners with Swiss universities on AI in drug discovery, real-world evidence studies, and digital therapeutics. Our campus in Basel hosts visiting thesis students who contribute to active research projects with publication potential.",
+    "size": "10001+",
+    "domains": ["Pharma & Healthcare"]
+  },
+  {
+    "id": "company-09",
+    "name": "Logitech",
+    "description": "A Swiss-American technology company that designs and manufactures personal peripherals and workspace solutions. Logitech creates products that bring people together through video, music, gaming and computing.",
+    "about": null,
+    "size": "1001-5000",
+    "domains": ["Consumer Electronics", "Technology"]
+  },
+  {
+    "id": "company-10",
+    "name": "Hilti",
+    "description": "A global leader in providing technology-led solutions to the construction and energy industries. Hilti develops products, systems and services that offer innovative solutions to construction professionals.",
+    "about": "Hilti supports thesis projects in digital construction, BIM integration, IoT-enabled tool management, and construction site safety. Students can access real project data from construction sites and work with our R&D team in Schaan.",
+    "size": "5001-10000",
+    "domains": ["Construction", "Industrial Technology"]
+  },
+  {
+    "id": "company-11",
+    "name": "Sonova",
+    "description": "A leading provider of innovative hearing care solutions, headquartered in Stäfa, Switzerland. Sonova operates through its core brands Phonak, Unitron, and Advanced Bionics.",
+    "about": null,
+    "size": "1001-5000",
+    "domains": ["MedTech", "Healthcare"]
+  },
+  {
+    "id": "company-12",
+    "name": "Bühler Group",
+    "description": "A global technology company specializing in food processing and advanced materials manufacturing. Bühler develops solutions for turning grain into flour, cocoa into chocolate, and much more.",
+    "about": "Bühler collaborates with universities on process optimization, food waste reduction, and sustainable manufacturing. Thesis students work on real production challenges with access to our innovation campus in Uzwil and pilot plants for testing new approaches.",
+    "size": "5001-10000",
+    "domains": ["Food Processing", "Manufacturing"]
+  },
+  {
+    "id": "company-13",
+    "name": "On Running",
+    "description": "A Swiss performance sportswear company known for its innovative CloudTec running shoes. On blends Swiss engineering with a passion for an active lifestyle to create award-winning footwear and apparel.",
+    "about": null,
+    "size": "1001-5000",
+    "domains": ["Sportswear", "Consumer Goods"]
+  },
+  {
+    "id": "company-14",
+    "name": "Migros",
+    "description": "Switzerland's largest retail company and the country's biggest employer in the private sector. Migros operates supermarkets, department stores, restaurants, and a wide range of consumer services.",
+    "about": "Migros supports thesis research in retail analytics, personalized commerce, supply chain sustainability, and consumer behavior. As Switzerland's largest retailer, we can offer students access to real transaction data and e-commerce analytics for their research.",
+    "size": "10001+",
+    "domains": ["Retail", "Consumer Goods"]
+  },
+  {
+    "id": "company-15",
+    "name": "Stadler Rail",
+    "description": "An international rail vehicle manufacturer headquartered in Bussnang, Switzerland. Stadler Rail produces a wide range of rolling stock including high-speed trains, regional and suburban trains, and trams.",
+    "about": null,
+    "size": "5001-10000",
+    "domains": ["Manufacturing", "Transportation"]
+  }
+]

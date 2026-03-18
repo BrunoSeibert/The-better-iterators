@@ -1,0 +1,212 @@
+[
+  {
+    "id": "program-01",
+    "name": "MSc Computer Science",
+    "degree": "msc",
+    "universityId": "uni-01",
+    "about": "Covers advanced topics in systems, algorithms, machine learning, and software engineering. Students choose from specializations including data management, visual computing, and theoretical CS. Thesis projects often involve industry partners in the Zurich tech ecosystem."
+  },
+  {
+    "id": "program-02",
+    "name": "MSc Mechanical Engineering",
+    "degree": "msc",
+    "universityId": "uni-01",
+    "about": "Focuses on robotics, energy systems, micro/nanotechnology, and product development. Strong lab infrastructure and close collaboration with Swiss precision manufacturing companies. Many theses are co-supervised with industry partners like ABB, Hilti, or Stadler Rail."
+  },
+  {
+    "id": "program-03",
+    "name": "BSc Electrical Engineering and Information Technology",
+    "degree": "bsc",
+    "universityId": "uni-01",
+    "about": null
+  },
+  {
+    "id": "program-04",
+    "name": "MSc Data Science",
+    "degree": "msc",
+    "universityId": "uni-02",
+    "about": "A highly interdisciplinary program combining statistics, machine learning, and domain-specific applications. Students work with large-scale datasets and modern ML frameworks. Thesis topics range from computational biology to NLP to climate modeling."
+  },
+  {
+    "id": "program-05",
+    "name": "MSc Communication Systems",
+    "degree": "msc",
+    "universityId": "uni-02",
+    "about": "Combines networking, security, and signal processing with a strong systems engineering perspective. Graduates work at the intersection of telecommunications, cybersecurity, and IoT. Close ties to Swisscom, Qualcomm, and the EPFL security labs."
+  },
+  {
+    "id": "program-06",
+    "name": "PhD Computational and Quantitative Biology",
+    "degree": "phd",
+    "universityId": "uni-02",
+    "about": null
+  },
+  {
+    "id": "program-07",
+    "name": "MSc Business Innovation",
+    "degree": "msc",
+    "universityId": "uni-03",
+    "about": "HSG's flagship program at the intersection of business, technology, and design thinking. Students work on real innovation challenges with corporate partners and build prototypes. Many graduates launch startups or join consulting firms focused on digital transformation."
+  },
+  {
+    "id": "program-08",
+    "name": "MA International Affairs and Governance",
+    "degree": "msc",
+    "universityId": "uni-03",
+    "about": "Prepares students for careers in international organizations, diplomacy, and public policy. Covers global governance, political economy, and sustainability. Thesis topics often address Swiss foreign policy, trade, or development cooperation."
+  },
+  {
+    "id": "program-09",
+    "name": "MSc Finance",
+    "degree": "msc",
+    "universityId": "uni-03",
+    "about": "One of Europe's top-ranked finance programs. Covers asset management, risk analysis, fintech, and sustainable finance. Strong alumni network in Swiss banking and insurance. Many students do thesis projects with UBS, Credit Suisse, or Swiss Re."
+  },
+  {
+    "id": "program-10",
+    "name": "BSc Business Administration",
+    "degree": "bsc",
+    "universityId": "uni-03",
+    "about": null
+  },
+  {
+    "id": "program-11",
+    "name": "MSc Informatics",
+    "degree": "msc",
+    "universityId": "uni-04",
+    "about": "Covers software systems, data science, AI, and people-oriented computing. The program benefits from UZH's proximity to ETH and the Zurich tech scene. Thesis projects often involve the university's AI research groups or industry partners in fintech and health tech."
+  },
+  {
+    "id": "program-12",
+    "name": "MSc Economics",
+    "degree": "msc",
+    "universityId": "uni-04",
+    "about": "Strong quantitative focus with specializations in econometrics, behavioral economics, and public economics. Zurich's position as a financial center provides unique thesis opportunities in banking regulation, monetary policy, and labor market analysis."
+  },
+  {
+    "id": "program-13",
+    "name": "PhD Psychology",
+    "degree": "phd",
+    "universityId": "uni-04",
+    "about": null
+  },
+  {
+    "id": "program-14",
+    "name": "MSc Biomedical Sciences",
+    "degree": "msc",
+    "universityId": "uni-05",
+    "about": "Combines molecular biology, neuroscience, and clinical research. Students access cutting-edge facilities at the Bern Biomedical Research center. Thesis projects often connect to Inselspital (Bern University Hospital) or Swiss pharma companies."
+  },
+  {
+    "id": "program-15",
+    "name": "BSc Economics and Social Sciences",
+    "degree": "bsc",
+    "universityId": "uni-05",
+    "about": null
+  },
+  {
+    "id": "program-16",
+    "name": "MSc Climate Sciences",
+    "degree": "msc",
+    "universityId": "uni-05",
+    "about": "One of Europe's leading climate science programs, leveraging Bern's Oeschger Centre for Climate Change Research. Students work with real climate data, ice cores, and atmospheric models. Thesis topics range from carbon cycle dynamics to climate policy analysis."
+  },
+  {
+    "id": "program-17",
+    "name": "MSc Molecular Biology",
+    "degree": "msc",
+    "universityId": "uni-06",
+    "about": "Located in the Basel life sciences hub alongside Roche and Novartis. Covers structural biology, genomics, and cell biology with access to world-class facilities at the Biozentrum. Many students do thesis projects directly embedded in pharma R&D labs."
+  },
+  {
+    "id": "program-18",
+    "name": "MSc Business and Technology",
+    "degree": "msc",
+    "universityId": "uni-06",
+    "about": null
+  },
+  {
+    "id": "program-19",
+    "name": "BSc Pharmaceutical Sciences",
+    "degree": "bsc",
+    "universityId": "uni-06",
+    "about": null
+  },
+  {
+    "id": "program-20",
+    "name": "MSc Applied Linguistics",
+    "degree": "msc",
+    "universityId": "uni-07",
+    "about": "Focuses on language technology, multilingual communication, and corpus linguistics. Students explore NLP, machine translation, and language assessment. Thesis projects often involve collaboration with Swiss media companies or public sector communication offices."
+  },
+  {
+    "id": "program-21",
+    "name": "MSc Engineering (Industrial Engineering)",
+    "degree": "msc",
+    "universityId": "uni-07",
+    "about": "Practice-oriented program covering production systems, supply chain optimization, and Industry 4.0. Strong ties to Swiss manufacturing SMEs and large industrials. Students complete thesis projects embedded in real production environments."
+  },
+  {
+    "id": "program-22",
+    "name": "BSc Business Information Technology",
+    "degree": "bsc",
+    "universityId": "uni-07",
+    "about": null
+  },
+  {
+    "id": "program-23",
+    "name": "MSc Data Science",
+    "degree": "msc",
+    "universityId": "uni-08",
+    "about": "Applied data science program with a focus on real-world projects in healthcare, finance, and smart manufacturing. Students learn Python, R, deep learning, and cloud computing. Thesis projects are typically done in partnership with regional industry partners."
+  },
+  {
+    "id": "program-24",
+    "name": "BSc Mechanical Engineering",
+    "degree": "bsc",
+    "universityId": "uni-08",
+    "about": null
+  },
+  {
+    "id": "program-25",
+    "name": "MSc Business Administration (Digital Transformation)",
+    "degree": "msc",
+    "universityId": "uni-08",
+    "about": "Prepares students to lead digital transformation in organizations. Covers digital strategy, IT governance, change management, and data-driven decision-making. Many thesis projects are done in collaboration with Swiss SMEs undergoing digitalization."
+  },
+  {
+    "id": "program-26",
+    "name": "MSc Computer Science",
+    "degree": "msc",
+    "universityId": "uni-09",
+    "about": "OST's computer science master emphasizes software engineering, cloud-native development, and applied AI. Small class sizes and close mentorship from faculty. Thesis projects often involve the university's research institutes or Eastern Swiss tech companies."
+  },
+  {
+    "id": "program-27",
+    "name": "BSc Renewable Energies and Environmental Engineering",
+    "degree": "bsc",
+    "universityId": "uni-09",
+    "about": null
+  },
+  {
+    "id": "program-28",
+    "name": "MSc Computational Science",
+    "degree": "msc",
+    "universityId": "uni-10",
+    "about": "USI's computational science program bridges mathematics, computer science, and scientific modeling. Students work on simulation, high-performance computing, and numerical methods. The program benefits from USI's Swiss National Supercomputing Centre (CSCS) partnership."
+  },
+  {
+    "id": "program-29",
+    "name": "MSc Finance",
+    "degree": "msc",
+    "universityId": "uni-10",
+    "about": null
+  },
+  {
+    "id": "program-30",
+    "name": "MSc Communication, Management and Health",
+    "degree": "msc",
+    "universityId": "uni-10",
+    "about": null
+  }
+]
