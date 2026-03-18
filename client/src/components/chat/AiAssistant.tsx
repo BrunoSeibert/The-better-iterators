@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useAuthStore } from '../../store/authStore';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -6,9 +7,11 @@ interface Message {
 }
 
 export default function AiAssistant() {
+  const token = useAuthStore((s) => s.token);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'How can I help you with your journey?' },
   ]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -27,13 +30,20 @@ export default function AiAssistant() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3001/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: newMessages,
+          conversationId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      if (data.conversationId) setConversationId(data.conversationId);
       setMessages([...newMessages, data.message]);
     } catch {
       setMessages([...newMessages, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
