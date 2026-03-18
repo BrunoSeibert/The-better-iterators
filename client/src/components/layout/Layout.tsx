@@ -7,6 +7,7 @@ import {
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
 import studyonLogo from '@/assets/Studyon_Logo.png';
+import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 
 const levels = Array.from({ length: 8 }, (_, index) => index + 1);
@@ -209,22 +210,23 @@ export default function Layout() {
           )}
           {assistantOpen && (
             <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-6 py-8 text-neutral-900 lg:w-[380px]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">
-                    Assistant
-                  </p>
-                  <h2 className="mt-3 text-2xl font-semibold">AI Assistant</h2>
+              <div className="relative flex justify-center">
+                <div className="flex justify-center">
+                  <img
+                    src={badgerImage}
+                    alt="Badger"
+                    className="h-24 w-24 rounded-full object-cover"
+                  />
                 </div>
                 <button
                   onClick={() => setAssistantOpen(false)}
-                  className="mt-1 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                  className="absolute right-0 top-0 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                   aria-label="Close AI Assistant"
                 >
                   x
                 </button>
               </div>
-              <div className="mt-6 h-[calc(100%-5rem)] min-h-[280px]">
+              <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
                 <AiAssistant />
               </div>
             </aside>
