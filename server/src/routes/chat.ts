@@ -33,10 +33,33 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       [convId, 'USER', userMessage.content]
     );
 
-    // Call OpenAI
+    // Fetch previous messages from other conversations for context
+    const prevResult = await db.query(
+      `SELECT m.role, m.content
+       FROM "Message" m
+       JOIN "Conversation" c ON c.id = m.conversation_id
+       WHERE c.user_id = $1 AND c.id != $2
+       ORDER BY m.created_at DESC
+       LIMIT 40`,
+      [userId, convId]
+    );
+
+    const previousMessages = prevResult.rows.reverse().map((m: { role: string; content: string }) => ({
+      role: m.role === 'USER' ? 'user' : 'assistant',
+      content: m.content,
+    }));
+
+    const systemContext = previousMessages.length > 0
+      ? `You are a helpful thesis journey assistant. Here is the user's previous chat history for context:\n\n${previousMessages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
+      : 'You are a helpful thesis journey assistant.';
+
+    // Call OpenAI with previous context + current messages
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages,
+      messages: [
+        { role: 'system', content: systemContext },
+        ...messages,
+      ],
     });
 
     const assistantMessage = completion.choices[0].message;
