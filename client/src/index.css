@@ -15,3 +15,16 @@
     background: #d4d4d4;
   }
 }
+
+@layer utilities {
+  .roadmap-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+
+  .roadmap-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
