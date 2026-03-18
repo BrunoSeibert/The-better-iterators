@@ -18,8 +18,8 @@ app.use(express.json());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // Routes
-// import { exampleRouter } from './routes/example';
-// app.use('/api/example', exampleRouter);
+import authRoutes from './routes/authRoutes';
+app.use('/api/auth', authRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
