@@ -6,7 +6,9 @@ interface Message {
 }
 
 export default function AiAssistant() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    { role: 'assistant', content: 'How can I help you with your journey?' },
+  ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -40,19 +42,9 @@ export default function AiAssistant() {
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }
-
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex-1 overflow-y-auto rounded-2xl border border-white/20 bg-black/10 p-4 text-sm">
-        {messages.length === 0 && (
-          <p className="text-center text-neutral-300">Ask me anything...</p>
-        )}
+      <div className="flex-1 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-4 text-sm">
         {messages.map((msg, i) => (
           <div
             key={i}
@@ -61,8 +53,8 @@ export default function AiAssistant() {
             <div
               className={`max-w-[85%] rounded-xl px-3 py-2 ${
                 msg.role === 'user'
-                  ? 'bg-white text-neutral-900'
-                  : 'bg-white/10 text-neutral-100'
+                  ? 'bg-neutral-900 text-white'
+                  : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
               }`}
             >
               {msg.content}
@@ -71,25 +63,27 @@ export default function AiAssistant() {
         ))}
         {loading && (
           <div className="mb-3 flex justify-start">
-            <div className="rounded-xl bg-white/10 px-3 py-2 text-neutral-300">...</div>
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-neutral-400">...</div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
       <div className="flex gap-2">
-        <textarea
-          rows={2}
+        <input
+          type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+          }}
           placeholder="Type a message..."
-          className="flex-1 resize-none rounded-xl bg-white/10 px-3 py-2 text-sm text-white placeholder-neutral-400 outline-none focus:ring-1 focus:ring-white/30"
+          className="flex-1 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400"
         />
         <button
           onClick={sendMessage}
           disabled={loading || !input.trim()}
-          className="self-end rounded-xl bg-white px-4 py-2 text-sm font-medium text-neutral-900 disabled:opacity-40"
+          className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-30"
         >
           Send
         </button>

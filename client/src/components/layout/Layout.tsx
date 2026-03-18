@@ -12,6 +12,7 @@ const unlockedLevel = 5;
 
 export default function Layout() {
   const [activeLevel, setActiveLevel] = useState(1);
+  const [assistantOpen, setAssistantOpen] = useState(true);
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -165,15 +166,39 @@ export default function Layout() {
           </div>
         </section>
 
-        <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-500 bg-neutral-500 px-6 py-8 text-white lg:w-[380px]">
-          <p className="text-xs uppercase tracking-[0.3em] text-neutral-200">
-            Assistant
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold">AI Assistant</h2>
-          <div className="mt-6 h-[calc(100%-5rem)] min-h-[280px]">
-            <AiAssistant />
-          </div>
-        </aside>
+        <div className="relative flex">
+          {!assistantOpen && (
+            <button
+              onClick={() => setAssistantOpen(true)}
+              className="absolute -left-5 top-1/2 z-10 flex h-16 w-5 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-neutral-200 bg-white text-neutral-400 shadow-md hover:text-neutral-700"
+              aria-label="Open AI Assistant"
+            >
+              ‹
+            </button>
+          )}
+          {assistantOpen && (
+            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-6 py-8 text-neutral-900 lg:w-[380px]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">
+                    Assistant
+                  </p>
+                  <h2 className="mt-3 text-2xl font-semibold">AI Assistant</h2>
+                </div>
+                <button
+                  onClick={() => setAssistantOpen(false)}
+                  className="mt-1 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                  aria-label="Close AI Assistant"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="mt-6 h-[calc(100%-5rem)] min-h-[280px]">
+                <AiAssistant />
+              </div>
+            </aside>
+          )}
+        </div>
       </main>
     </div>
   );
