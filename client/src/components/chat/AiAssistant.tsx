@@ -31,6 +31,7 @@ export default function AiAssistant() {
         body: JSON.stringify({ messages: newMessages }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setMessages([...newMessages, data.message]);
     } catch {
       setMessages([...newMessages, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
