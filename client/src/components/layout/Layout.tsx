@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import AiAssistant from '../chat/AiAssistant';
 
 const levels = Array.from({ length: 8 }, (_, index) => index + 1);
 const unlockedLevel = 5;
@@ -81,8 +82,8 @@ export default function Layout() {
             Assistant
           </p>
           <h2 className="mt-3 text-2xl font-semibold">AI Assistant</h2>
-          <div className="mt-6 flex h-[calc(100%-5rem)] min-h-[280px] items-center justify-center rounded-2xl border border-white/20 bg-black/10 p-6 text-center text-sm text-neutral-100">
-            Right-side panel reserved for the chat interface.
+          <div className="mt-6 h-[calc(100%-5rem)] min-h-[280px]">
+            <AiAssistant />
           </div>
         </aside>
       </main>
