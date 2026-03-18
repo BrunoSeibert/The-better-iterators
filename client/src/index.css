@@ -37,22 +37,26 @@
 
 @layer utilities {
   .roadmap-scroll {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 212, 212, 0.95) transparent;
   }
   .roadmap-scroll::-webkit-scrollbar {
-    display: none;
+    height: 6px;
   }
 
-  .text-ai {
-    @apply text-transparent bg-clip-text;
-    background-image: linear-gradient(to right, #a855f7, #1d4ed8, #3b82f6);
+  .roadmap-scroll::-webkit-scrollbar-track {
+    background: transparent;
   }
-  .bg-ai {
-    background-image: linear-gradient(to right, #7e22ce, #2563eb 60%, #7e22ce);
-    color: white;
+
+  .roadmap-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(212, 212, 212, 0.95);
+  }
+
+  .roadmap-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(163, 163, 163, 0.95);
   }
 
   .ds-caption     { font-size: 12px; font-weight: 400; line-height: 16px; }

@@ -4,8 +4,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
+import studyonLogo from '@/assets/Studyon_Logo.png';
 
 const levels = Array.from({ length: 8 }, (_, index) => index + 1);
 const unlockedLevel = 5;
@@ -13,6 +14,7 @@ const unlockedLevel = 5;
 export default function Layout() {
   const [activeLevel, setActiveLevel] = useState(1);
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -88,7 +90,24 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
-      <header className="h-[10vh] min-h-[72px] bg-black" />
+      <header className="flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+        <img
+          src={studyonLogo}
+          alt="Studyon logo"
+          className="h-14 w-14 object-contain brightness-0 invert"
+        />
+        <button
+          type="button"
+          onClick={() => navigate('/streak')}
+          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
+          aria-label="Open streak page"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-current">
+            <path d="M13.09 2.91c.42 2.37-.54 3.98-1.47 5.53-.86 1.44-1.68 2.8-1.24 4.72.2.85.71 1.67 1.44 2.31-.13-1.7.61-2.9 1.37-4.11.92-1.46 1.87-2.98 1.5-5.28 2.52 1.77 4.31 4.75 4.31 7.92A7 7 0 1 1 7 11.9c.25-1.73 1.2-3.3 2.58-4.37-.27 2.03.34 3.27 1.04 4.18.06-1.92 1-3.48 1.9-4.98.98-1.63 1.91-3.18 1.57-5.82Z" />
+          </svg>
+          <span className="text-xl font-semibold text-orange-400">1</span>
+        </button>
+      </header>
 
       <main className="flex min-h-[90vh]">
         <section className="flex min-w-0 flex-1 flex-col">
@@ -173,7 +192,7 @@ export default function Layout() {
               className="absolute -left-5 top-1/2 z-10 flex h-16 w-5 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-neutral-200 bg-white text-neutral-400 shadow-md hover:text-neutral-700"
               aria-label="Open AI Assistant"
             >
-              ‹
+              {'<'}
             </button>
           )}
           {assistantOpen && (
@@ -190,7 +209,7 @@ export default function Layout() {
                   className="mt-1 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                   aria-label="Close AI Assistant"
                 >
-                  ✕
+                  x
                 </button>
               </div>
               <div className="mt-6 h-[calc(100%-5rem)] min-h-[280px]">
