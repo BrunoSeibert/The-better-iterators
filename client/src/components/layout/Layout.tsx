@@ -99,16 +99,6 @@ export default function Layout() {
           alt="Studyon logo"
           className="h-14 w-14 object-contain brightness-0 invert"
         />
-        <div className="ml-auto">
-          <button
-            type="button"
-            onClick={() => { logout(); navigate('/login'); }}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
-            aria-label="Logout"
-          >
-            <span className="text-sm font-medium">Logout</span>
-          </button>
-        </div>
         <button
           type="button"
           onClick={() => navigate('/streak')}
@@ -120,6 +110,16 @@ export default function Layout() {
           </svg>
           <span className="text-xl font-semibold text-orange-400">1</span>
         </button>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => { logout(); navigate('/login'); }}
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+            aria-label="Logout"
+          >
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
       </header>
 
       <main className="flex min-h-[90vh]">
