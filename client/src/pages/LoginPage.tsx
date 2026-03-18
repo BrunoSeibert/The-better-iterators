@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,7 +32,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const token = useAuthStore((s) => s.token);
   const setAuth = useAuthStore((s) => s.setAuth);
+
+  useEffect(() => {
+    if (token) {
+      navigate('/app');
+    }
+  }, [navigate, token]);
 
   const emailForm = useForm<EmailForm>({ resolver: zodResolver(emailSchema) });
   const passwordForm = useForm<PasswordForm>({ resolver: zodResolver(passwordSchema) });
@@ -49,7 +56,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.login(email, data.password);
       setAuth(result.user, result.token);
-      navigate('/');
+      navigate('/app');
     } catch {
       setError('Invalid email or password');
     }
@@ -60,7 +67,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.register(data.name, data.email, data.password);
       setAuth(result.user, result.token);
-      navigate('/');
+      navigate('/app');
     } catch {
       setError('Registration failed. Email may already be in use.');
     }
