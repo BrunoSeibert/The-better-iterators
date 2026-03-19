@@ -10,6 +10,7 @@ interface MapMatch {
   lng: number;
   type: 'company' | 'university';
   description?: string;
+  match: number; // AI match score (0-1)
 }
 
 export default function Level2() {
@@ -30,10 +31,10 @@ export default function Level2() {
       .catch(() => {
         // Mock data
         const mockData: MapMatch[] = [
-          { id: "1", name: "Google Zurich", lat: 47.3769, lng: 8.5417, type: "company", description: "AI Research" },
-          { id: "2", name: "ETH Zurich", lat: 47.398, lng: 8.543, type: "university" },
-          { id: "3", name: "ZHAW Winterthur", lat: 47.505, lng: 8.725, type: "university" },
-          { id: "4", name: "IBM Research", lat: 47.364, lng: 8.515, type: "company" }
+          { id: "1", name: "Google Zurich", lat: 47.3769, lng: 8.5417, type: "company", description: "AI Research", match: 0.92 },
+          { id: "2", name: "ETH Zurich", lat: 47.398, lng: 8.543, type: "university", match: 0.85 },
+          { id: "3", name: "ZHAW Winterthur", lat: 47.505, lng: 8.725, type: "university", match: 0.78 },
+          { id: "4", name: "IBM Research", lat: 47.364, lng: 8.515, type: "company", match: 0.88 }
         ];
         setAllMatches(mockData);
         setLoading(false);
@@ -45,41 +46,27 @@ export default function Level2() {
     if (!containerRef.current || mapRef.current || loading || allMatches.length === 0) return;
 
     mapRef.current = L.map(containerRef.current).setView([47.3769, 8.5417], 11);
-    
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 20
     }).addTo(mapRef.current);
 
-    // Add all markers
-    allMatches.forEach(match => {
-      L.marker([match.lat, match.lng])
-        .addTo(mapRef.current!)
-        .bindPopup(`
-          <div style="min-width: 200px;">
-            <b>${match.name}</b><br/>
-            <small style="color: #666;">${match.type}</small><br/>
-            ${match.description ? `<small>${match.description}</small>` : ''}
-            <div style="margin-top: 8px; color: #10b981; font-weight: bold;">92% Match ✨</div>
-          </div>
-        `);
-    });
+    addMarkers(allMatches);
 
     setTimeout(() => mapRef.current?.invalidateSize(), 100);
-  }, [allMatches, loading]); // Fixed: stable deps
+  }, [allMatches, loading]);
 
-  const updateMarkers = (matches: MapMatch[]) => {
+  // Function to add markers to the map
+  const addMarkers = (matches: MapMatch[]) => {
     if (!mapRef.current) return;
 
     // Clear existing markers
     mapRef.current.eachLayer(layer => {
-      if (layer instanceof L.Marker) {
-        mapRef.current!.removeLayer(layer);
-      }
+      if (layer instanceof L.Marker) mapRef.current!.removeLayer(layer);
     });
 
-    // Add new markers
     matches.forEach(match => {
       L.marker([match.lat, match.lng])
         .addTo(mapRef.current!)
@@ -87,8 +74,10 @@ export default function Level2() {
           <div style="min-width: 200px;">
             <b>${match.name}</b><br/>
             <small style="color: #666;">${match.type}</small><br/>
-            ${match.description ? `<small>${match.description}</small>` : ''}
-            <div style="margin-top: 8px; color: #10b981; font-weight: bold;">{m}</div>
+            ${match.description ? `<small>${match.description}</small><br/>` : ''}
+            <div style="margin-top: 8px; color: #10b981; font-weight: bold;">
+              ${(match.match * 100).toFixed(0)}% Match ✨
+            </div>
           </div>
         `);
     });
@@ -103,8 +92,8 @@ export default function Level2() {
     let filtered = allMatches;
     if (type === 'companies') filtered = allMatches.filter(m => m.type === 'company');
     if (type === 'universities') filtered = allMatches.filter(m => m.type === 'university');
-    
-    updateMarkers(filtered);
+
+    addMarkers(filtered);
   };
 
   if (loading) {
