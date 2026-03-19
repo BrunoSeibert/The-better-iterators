@@ -4,6 +4,7 @@ import {
   type DragEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -67,9 +68,9 @@ export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
-  const completedStages = user?.completedStages ?? [];
-  const preferredActiveLevel = getPreferredActiveLevel(user?.currentLevel, completedStages);
-  const furthestUnlockedLevel = getFurthestUnlockedLevel(completedStages);
+  const completedStages = useMemo(() => user?.completedStages ?? [], [user?.completedStages]);
+  const preferredActiveLevel = useMemo(() => getPreferredActiveLevel(user?.currentLevel, completedStages), [user?.currentLevel, completedStages]);
+  const furthestUnlockedLevel = useMemo(() => getFurthestUnlockedLevel(completedStages), [completedStages]);
   const [activeLevel, setActiveLevel] = useState(preferredActiveLevel);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
@@ -98,15 +99,20 @@ export default function Layout() {
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
 
-  const todayCheckinDone = (() => {
+  const [checkinDone, setCheckinDone] = useState(() => {
     try {
       const raw = localStorage.getItem('todayCheckin');
       if (!raw) return false;
       return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
     } catch { return false; }
-  })();
-  const [checkinDone, setCheckinDone] = useState(todayCheckinDone);
-  const [checkinOpen, setCheckinOpen] = useState(!todayCheckinDone);
+  });
+  const [checkinOpen, setCheckinOpen] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return true;
+      return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
+    } catch { return true; }
+  });
   const prevUnlockedRef = useRef<Set<string>>(new Set());
   const isInitializedRef = useRef(false); 
 
@@ -132,6 +138,7 @@ export default function Layout() {
         try {
           const summary = await authService.getStreakSummary({ force: true });
           streak = summary.currentStreak;
+          setDailyStreak(streak);
         } catch {
           streak = 0;
         }
@@ -139,7 +146,7 @@ export default function Layout() {
           BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
         );
         isInitializedRef.current = true;
-    }
+      }
 
 
       return {
@@ -159,71 +166,35 @@ export default function Layout() {
     [applyLevelState]
   );
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
+    if (!container) return;
     const target = event.target as HTMLElement;
-
-    if (target.closest('button')) {
-      return;
-    }
-
-    dragState.current = {
-      isDragging: true,
-      startX: event.clientX,
-      scrollLeft: container.scrollLeft,
-    };
-
+    if (target.closest('button')) return;
+    dragState.current = { isDragging: true, startX: event.clientX, scrollLeft: container.scrollLeft };
     container.setPointerCapture(event.pointerId);
-  };
+  }, []);
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
+    if (!container || !dragState.current.isDragging) return;
+    container.scrollLeft = dragState.current.scrollLeft - (event.clientX - dragState.current.startX);
+  }, []);
 
-    if (!container || !dragState.current.isDragging) {
-      return;
-    }
-
-    const deltaX = event.clientX - dragState.current.startX;
-    container.scrollLeft = dragState.current.scrollLeft - deltaX;
-  };
-
-  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+  const handleWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    if (container.scrollWidth <= container.clientWidth) {
-      return;
-    }
-
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY;
-
-    if (delta === 0) {
-      return;
-    }
-
+    if (!container || container.scrollWidth <= container.clientWidth) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (delta === 0) return;
     event.preventDefault();
     container.scrollLeft += delta;
-  };
+  }, []);
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
     dragState.current.isDragging = false;
-
-    if (container?.hasPointerCapture(event.pointerId)) {
-      container.releasePointerCapture(event.pointerId);
-    }
-  };
+    if (container?.hasPointerCapture(event.pointerId)) container.releasePointerCapture(event.pointerId);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -268,30 +239,6 @@ export default function Layout() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!localStorage.getItem('token')) {
-      return;
-    }
-
-    let isMounted = true;
-
-    authService
-      .getStreakSummary({ force: true })
-      .then((summary) => {
-        if (isMounted) {
-          setDailyStreak(summary.currentStreak);
-        }
-      })
-      .catch(() => {
-        if (isMounted && authService.peekStreakSummary() === null) {
-          setDailyStreak(0);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const level = user?.currentLevel ?? 0;
   const resolvedDailyStreak = dailyStreak ?? 0;
@@ -348,18 +295,10 @@ export default function Layout() {
     }
   };
 
-  const handleLevelSelect = async (level: number) => {
-    if (levelLoading) {
-      return;
-    }
-
-    try {
-      await refreshLevelState(level);
-    } catch {
-      logout();
-      navigate('/');
-    }
-  };
+  const handleLevelSelect = useCallback((level: number) => {
+    if (levelLoading) return;
+    if (isLevelUnlocked(level, completedStages)) setActiveLevel(level);
+  }, [levelLoading, completedStages]);
 
   const handleLevelSixFile = (file: File | null) => {
     if (!file) {
