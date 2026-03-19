@@ -5,67 +5,28 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/', requireAuth, async (req: Request, res: Response) => {
-  const { messages, conversationId } = req.body;
-  const userId = (req as AuthRequest).userId;
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Cache loaded once at startup
+let dbCache: string | null = null;
 
-  if (!messages || !Array.isArray(messages)) {
-    res.status(400).json({ error: 'messages array is required' });
-    return;
-  }
+async function getDbContext(): Promise<string> {
+  if (dbCache) return dbCache;
 
-  try {
-    // Get or create conversation
-    let convId = conversationId;
-    if (!convId) {
-      const conv = await db.query(
-        'INSERT INTO "Conversation" (user_id) VALUES ($1) RETURNING id',
-        [userId]
-      );
-      convId = conv.rows[0].id;
-    }
+  const [
+    universities, studyPrograms, fields, companies,
+    students, supervisors, experts, topics, projects
+  ] = await Promise.all([
+    db.query('SELECT * FROM universities'),
+    db.query('SELECT * FROM study_programs'),
+    db.query('SELECT * FROM fields'),
+    db.query('SELECT * FROM companies'),
+    db.query('SELECT * FROM students'),
+    db.query('SELECT * FROM supervisors'),
+    db.query('SELECT * FROM experts'),
+    db.query('SELECT * FROM topics'),
+    db.query('SELECT * FROM projects'),
+  ]);
 
-    // Save user message
-    const userMessage = messages[messages.length - 1];
-    await db.query(
-      'INSERT INTO "Message" (conversation_id, role, content) VALUES ($1, $2, $3)',
-      [convId, 'USER', userMessage.content]
-    );
-
-    // Fetch previous messages for context
-    const prevResult = await db.query(
-      `SELECT m.role, m.content
-       FROM "Message" m
-       JOIN "Conversation" c ON c.id = m.conversation_id
-       WHERE c.user_id = $1 AND c.id != $2
-       ORDER BY m.created_at DESC
-       LIMIT 40`,
-      [userId, convId]
-    );
-
-    const previousMessages = prevResult.rows.reverse().map((m: { role: string; content: string }) => ({
-      role: m.role === 'USER' ? 'user' : 'assistant',
-      content: m.content,
-    }));
-
-    // ---- Fetch all 9 tables ----
-    const [
-      universities, studyPrograms, fields, companies,
-      students, supervisors, experts, topics, projects
-    ] = await Promise.all([
-      db.query('SELECT * FROM universities'),
-      db.query('SELECT * FROM study_programs'),
-      db.query('SELECT * FROM fields'),
-      db.query('SELECT * FROM companies'),
-      db.query('SELECT * FROM students'),
-      db.query('SELECT * FROM supervisors'),
-      db.query('SELECT * FROM experts'),
-      db.query('SELECT * FROM topics'),
-      db.query('SELECT * FROM projects'),
-    ]);
-
-    const dbContext = `
+  dbCache = `
 ## Platform Data
 
 ### Universities
@@ -96,6 +57,52 @@ ${JSON.stringify(topics.rows, null, 2)}
 ${JSON.stringify(projects.rows, null, 2)}
 `;
 
+  return dbCache;
+}
+
+router.post('/', requireAuth, async (req: Request, res: Response) => {
+  const { messages, conversationId } = req.body;
+  const userId = (req as AuthRequest).userId;
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  if (!messages || !Array.isArray(messages)) {
+    res.status(400).json({ error: 'messages array is required' });
+    return;
+  }
+
+  try {
+    let convId = conversationId;
+    if (!convId) {
+      const conv = await db.query(
+        'INSERT INTO "Conversation" (user_id) VALUES ($1) RETURNING id',
+        [userId]
+      );
+      convId = conv.rows[0].id;
+    }
+
+    const userMessage = messages[messages.length - 1];
+    await db.query(
+      'INSERT INTO "Message" (conversation_id, role, content) VALUES ($1, $2, $3)',
+      [convId, 'USER', userMessage.content]
+    );
+
+    const prevResult = await db.query(
+      `SELECT m.role, m.content
+       FROM "Message" m
+       JOIN "Conversation" c ON c.id = m.conversation_id
+       WHERE c.user_id = $1 AND c.id != $2
+       ORDER BY m.created_at DESC
+       LIMIT 40`,
+      [userId, convId]
+    );
+
+    const previousMessages = prevResult.rows.reverse().map((m: { role: string; content: string }) => ({
+      role: m.role === 'USER' ? 'user' : 'assistant',
+      content: m.content,
+    }));
+
+    const dbContext = await getDbContext(); // ← cached after first call
+
     const previousContext = previousMessages.length > 0
       ? `\n\n## Previous Chat History\n${previousMessages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
       : '';
@@ -111,7 +118,7 @@ When writing mathematical expressions, you MUST use these exact formats:
 
 ${dbContext}
 ${previousContext}`;
-    // Call OpenAI
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -122,7 +129,6 @@ ${previousContext}`;
 
     const assistantMessage = completion.choices[0].message;
 
-    // Save assistant message
     await db.query(
       'INSERT INTO "Message" (conversation_id, role, content) VALUES ($1, $2, $3)',
       [convId, 'ASSISTANT', assistantMessage.content]
@@ -135,3 +141,4 @@ ${previousContext}`;
 });
 
 export { router as chatRouter };
+
