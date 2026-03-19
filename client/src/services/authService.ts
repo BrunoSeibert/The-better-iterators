@@ -33,24 +33,6 @@ export async function progressLevel() {
   return res.data as { user: AuthUser };
 }
 
-export async function getTopicsByUniversity() {
-  const res = await api.get('/topics/by-university');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      type: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-      universityId: string;
-    }[];
-  };
-}
-
 export async function getStreakSummary() {
   const res = await api.get('/auth/streak');
   return res.data as {

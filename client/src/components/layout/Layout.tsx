@@ -12,7 +12,6 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import AiAssistant from '../chat/AiAssistant';
-import Level2 from '@/pages/Level2';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
@@ -499,7 +498,7 @@ export default function Layout() {
             type="button"
             onClick={() => updateLevel('reset')}
             disabled={levelLoading}
-            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Reset Level
           </button>
@@ -508,11 +507,11 @@ export default function Layout() {
               type="button"
               onClick={() => updateLevel('progress')}
               disabled={levelLoading}
-              className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Progress Level
-            </button>
-          )}
+              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Progress Level
+              </button>
+            )}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
@@ -616,7 +615,6 @@ export default function Layout() {
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
-              {activeLevel === 2 && <Level2 />}
               {activeLevel === 6 && (
                 levelSixCorrecting ? (
                   <div className="flex h-full w-full flex-col rounded-md bg-neutral-100 px-5 py-5 text-neutral-900">
@@ -815,3 +813,4 @@ export default function Layout() {
     </div>
   );
 }
+
