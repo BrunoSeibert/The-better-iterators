@@ -554,8 +554,9 @@ export default function Layout() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => setCheckinOpen(true)}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+            onClick={() => !checkinDone && setCheckinOpen(true)}
+            disabled={checkinDone}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
           >
             {checkinDone ? '✓ Checked in' : 'Daily check-in'}
           </button>

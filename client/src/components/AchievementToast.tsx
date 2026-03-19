@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Props = {
   emoji: string;
@@ -12,23 +12,23 @@ export default function AchievementToast({ emoji, label, description, onDone }: 
 
   const dismiss = () => {
     setVisible(false);
-    setTimeout(onDone, 500);
+    setTimeout(() => onDoneRef.current(), 500);
   };
 
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
   useEffect(() => {
-    // Slide in
     const showTimer = setTimeout(() => setVisible(true), 50);
-    // Slide out after 3.5s
     const hideTimer = setTimeout(() => setVisible(false), 3500);
-    // Remove from DOM after animation
-    const doneTimer = setTimeout(onDone, 4000);
+    const doneTimer = setTimeout(() => onDoneRef.current(), 4000);
 
     return () => {
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
       clearTimeout(doneTimer);
     };
-  }, [onDone]);
+  }, []);
 
   return (
     <div
