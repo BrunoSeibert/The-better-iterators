@@ -435,34 +435,38 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
-            {showTopbarBadgerButton && (
-              <button
-                type="button"
-                onClick={openAssistant}
-                className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
-                aria-label="Show AI Assistant"
-              >
-                <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
-                {showTopbarBadgerImage && (
-                  <img
-                    src={badgerImage}
-                    alt="Badger"
-                    className="h-full w-full rounded-[15%] object-cover"
-                  />
-                )}
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => { logout(); navigate('/login'); }}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
-            aria-label="Logout"
-          >
-            <span className="text-sm font-medium">Logout</span>
-          </button>
+        <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
+          {showTopbarBadgerButton && (
+            <button
+              type="button"
+              onClick={openAssistant}
+              className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+              aria-label="Show AI Assistant"
+            >
+              <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
+              {showTopbarBadgerImage && (
+                <img
+                  src={badgerImage}
+                  alt="Badger"
+                  className="h-full w-full rounded-[15%] object-cover"
+                />
+              )}
+            </button>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          aria-label="Profile"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z"/>
+          </svg>
+          <span className="text-sm font-medium">Profile</span>
+        </button>
+      </div>
+
       </header>
 
       <main
