@@ -56,13 +56,6 @@ export default function Dashboard() {
   const [deadlineInput, setDeadlineInput] = useState('');
   const streak = peekStreakSummary()?.currentStreak ?? 0;
 
-  const [checkinDone, setCheckinDone] = useState(() => {
-    try {
-      const raw = localStorage.getItem('todayCheckin');
-      if (!raw) return false;
-      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
-    } catch { return false; }
-  });
   const [checkinOpen, setCheckinOpen] = useState(false);
 
   useEffect(() => {
@@ -163,13 +156,6 @@ export default function Dashboard() {
             <span className="text-base font-semibold text-orange-400">{streak} days</span>
           </button>
           <button
-            onClick={() => !checkinDone && setCheckinOpen(true)}
-            disabled={checkinDone}
-            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
-          <button
             type="button"
             onClick={() => navigate('/profile', { state: { returnTo: '/dashboard' } })}
             className="flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
@@ -198,7 +184,7 @@ export default function Dashboard() {
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(140,115,95,1)' }}>Daily check-in</p>
               <button onClick={() => setCheckinOpen(false)} style={{ fontSize: 16, color: 'rgba(140,115,95,1)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}>✕</button>
             </div>
-            <DailyCheckin onComplete={() => { setCheckinDone(true); setCheckinOpen(false); }} />
+            <DailyCheckin onComplete={() => setCheckinOpen(false)} />
           </div>
         </div>
       )}

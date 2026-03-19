@@ -130,13 +130,6 @@ export default function Layout() {
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
 
-  const [checkinDone, setCheckinDone] = useState(() => {
-    try {
-      const raw = localStorage.getItem('todayCheckin');
-      if (!raw) return false;
-      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
-    } catch { return false; }
-  });
   const [checkinOpen, setCheckinOpen] = useState(() => {
     try {
       const raw = localStorage.getItem('todayCheckin');
@@ -227,10 +220,7 @@ export default function Layout() {
           ]);
           streak = summary.currentStreak;
           setDailyStreak(streak);
-          if (checkedInToday) {
-            setCheckinDone(true);
-            setCheckinOpen(false);
-          }
+          setCheckinOpen(!checkedInToday);
         } catch {
           streak = 0;
         }
@@ -478,16 +468,7 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
-  const handleCheckinButtonClick = () => {
-    if (checkinDone) {
-      localStorage.removeItem('todayCheckin');
-      setCheckinDone(false);
-    }
-
-    setCheckinOpen(true);
-  };
-
-  const closeAssistant = () => {
+const closeAssistant = () => {
     const source = assistantBadgerRef.current?.getBoundingClientRect();
     const target = badgerButtonSlotRef.current?.getBoundingClientRect();
 
@@ -636,12 +617,6 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleCheckinButtonClick}
-            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
@@ -936,7 +911,7 @@ export default function Layout() {
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => setCheckinDone(true)} />
+            <DailyCheckin onComplete={() => setCheckinOpen(false)} />
           </div>
         </div>
       )}
