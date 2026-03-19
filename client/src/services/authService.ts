@@ -249,6 +249,35 @@ export async function literatureAnalyze(
   return { ...res.data, input };
 }
 
+export type ProposalMessage = { role: 'user' | 'assistant'; content: string };
+
+export async function proposalTopicFeedback(
+  topicTitle: string,
+  topicDescription: string,
+  messages: ProposalMessage[]
+): Promise<{ critique: string; suggestion: string; feasibility: 'high' | 'medium' | 'low' }> {
+  const res = await api.post('/proposal', { phase: 'topic-feedback', topicTitle, topicDescription, messages });
+  return res.data;
+}
+
+export async function proposalSectionFeedback(
+  section: 'question' | 'motivation' | 'approach' | 'outcome',
+  content: string,
+  allSections: Record<string, string>,
+  messages: ProposalMessage[]
+): Promise<{ critique: string; suggestion: string }> {
+  const res = await api.post('/proposal', { phase: 'section-feedback', section, content, allSections, messages });
+  return res.data;
+}
+
+export async function proposalGenerateFinal(
+  topic: { title: string; description?: string },
+  sections: { question: string; motivation: string; approach: string; outcome: string }
+): Promise<{ title: string; body: string }> {
+  const res = await api.post('/proposal', { phase: 'generate-final', topic, sections });
+  return res.data;
+}
+
 export async function completeOnboarding(data: {
   currentLevel: number;
   completedStages: number[];
