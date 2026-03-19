@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -118,6 +119,8 @@ ${JSON.stringify(currentUser, null, 2)}
       ? `\n\n## Today's Check-in\n${checkinContext}`
       : '';
 
+    const thesisSection = await getThesisContext(userId);
+
     const systemPrompt = `You are StudyOnd's AI thesis assistant. Help students find thesis topics, supervisors, companies and experts that match their interests and goals.
 
 When making recommendations, always refer to specific names, titles and descriptions from the platform data below. Be specific and helpful.
@@ -129,7 +132,7 @@ When writing mathematical expressions, you MUST use these exact formats:
 
 ${userContext}
 ${dbContext}
-${previousContext}${checkinSection}`;
+${previousContext}${checkinSection}${thesisSection}`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

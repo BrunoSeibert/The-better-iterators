@@ -136,6 +136,30 @@ export async function getUserById(userId: string) {
   return result.rows[0] ?? null;
 }
 
+export async function completeLevelById(userId: string, level: number) {
+  const currentResult = await db.query(
+    'SELECT current_level, completed_stages FROM "User" WHERE id = $1',
+    [userId]
+  );
+  const currentUser = currentResult.rows[0];
+  if (!currentUser) return null;
+
+  const completedStages = normalizeCompletedStages(currentUser.completed_stages);
+  if (!isLevelUnlocked(level, completedStages) || completedStages.includes(level)) {
+    return currentUser;
+  }
+
+  const nextCompletedStages = [...completedStages, level];
+  const nextLevel = getFirstOpenLevel(nextCompletedStages);
+
+  const result = await db.query(
+    `UPDATE "User" SET current_level = $1, completed_stages = $2 WHERE id = $3
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date`,
+    [nextLevel, nextCompletedStages, userId]
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function resetLevel(userId: string) {
   const result = await db.query(
     'UPDATE "User" SET current_level = $1, completed_stages = $2 WHERE id = $3 RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date',
@@ -176,6 +200,39 @@ export async function progressLevel(userId: string) {
     [nextLevel, nextCompletedStages, userId]
   );
   return result.rows[0] ?? null;
+}
+
+export async function getThesisContext(userId: string): Promise<string> {
+  try {
+    await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
+    const result = await db.query('SELECT level_metadata FROM "User" WHERE id = $1', [userId]);
+    const meta = (result.rows[0]?.level_metadata as Record<string, string>) ?? {};
+    const parts: string[] = [];
+    if (meta['1']) parts.push(`Thesis topic: ${meta['1']}`);
+    if (meta['2']) parts.push(`Advisor: ${meta['2']}`);
+    if (meta['3']) parts.push(
+      `RESEARCH QUESTION (most important — all advice must directly relate to this):\n"${meta['3']}"`
+    );
+    return parts.length > 0 ? `\n\n## Student's Thesis Context\n${parts.join('\n')}` : '';
+  } catch { return ''; }
+}
+
+export async function getLevelMetadata(userId: string): Promise<Record<string, string>> {
+  await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
+  const result = await db.query('SELECT level_metadata FROM "User" WHERE id = $1', [userId]);
+  return (result.rows[0]?.level_metadata as Record<string, string>) ?? {};
+}
+
+export async function setLevelMetadata(userId: string, level: number, value: string): Promise<Record<string, string>> {
+  await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
+  const result = await db.query(
+    `UPDATE "User"
+     SET level_metadata = COALESCE(level_metadata, '{}') || jsonb_build_object($2::text, $3::text)
+     WHERE id = $1
+     RETURNING level_metadata`,
+    [userId, String(level), value]
+  );
+  return (result.rows[0]?.level_metadata as Record<string, string>) ?? {};
 }
 
 export async function getStreakSummary(userId: string) {

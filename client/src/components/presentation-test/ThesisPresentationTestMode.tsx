@@ -8,9 +8,11 @@ import {
 } from '@/services/presentationTestService';
 import mascotCouchImage from '@/assets/Mascot_Couch.png';
 
-const DEFAULT_SESSION_SECONDS = 8 * 60;
-const QUESTION_INTERVAL_SECONDS = 60;
+const DEFAULT_DURATION_MINUTES = 8;
+const DEFAULT_INTERVAL_SECONDS = 60;
 const TRANSCRIPTION_CHUNK_MS = 15_000;
+const DURATION_OPTIONS_MINUTES = [1, 4, 8, 12, 20];
+const INTERVAL_OPTIONS_SECONDS = [15, 30, 60, 120, 300];
 
 type SessionState = 'idle' | 'preparing' | 'running' | 'evaluating' | 'finished' | 'error';
 
@@ -146,7 +148,9 @@ export default function ThesisPresentationTestMode() {
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<string[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState(DEFAULT_SESSION_SECONDS);
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
+  const [selectedIntervalSeconds, setSelectedIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState(DEFAULT_DURATION_MINUTES * 60);
   const [transcriptEntries, setTranscriptEntries] = useState<PresentationTestTranscriptEntry[]>([]);
   const [evaluation, setEvaluation] = useState<PresentationTestEvaluation | null>(null);
   const [captureStatus, setCaptureStatus] = useState('Ready');
@@ -166,12 +170,13 @@ export default function ThesisPresentationTestMode() {
 
   const currentQuestion = questions[currentQuestionIndex] ?? 'Preparing your next question...';
   const safeEvaluation = normalizeEvaluation(evaluation);
+  const totalSessionSeconds = selectedDurationMinutes * 60;
   const listeningIndicator = sessionState === 'running' && captureStatus === 'Listening...'
     ? `Listening${'.'.repeat(listeningDotCount)}`
     : captureStatus;
   const totalQuestions = useMemo(
-    () => Math.max(1, Math.ceil(DEFAULT_SESSION_SECONDS / QUESTION_INTERVAL_SECONDS)),
-    []
+    () => Math.max(1, Math.ceil(totalSessionSeconds / selectedIntervalSeconds)),
+    [selectedIntervalSeconds, totalSessionSeconds]
   );
 
   const clearTimerInterval = useCallback(() => {
@@ -199,7 +204,7 @@ export default function ThesisPresentationTestMode() {
     setError(null);
     setQuestions([]);
     setCurrentQuestionIndex(0);
-    setTimeRemainingSeconds(DEFAULT_SESSION_SECONDS);
+    setTimeRemainingSeconds(totalSessionSeconds);
     setTranscriptEntries([]);
     transcriptEntriesRef.current = [];
     setEvaluation(null);
@@ -214,7 +219,7 @@ export default function ThesisPresentationTestMode() {
     const midpointMs = startedAtMs + (endedAtMs - startedAtMs) / 2;
     const questionIndex = Math.min(
       totalQuestions - 1,
-      Math.max(0, Math.floor((midpointMs - sessionStartAt) / (QUESTION_INTERVAL_SECONDS * 1000)))
+      Math.max(0, Math.floor((midpointMs - sessionStartAt) / (selectedIntervalSeconds * 1000)))
     );
 
     setCaptureStatus('Transcribing latest answer segment...');
@@ -335,7 +340,7 @@ export default function ThesisPresentationTestMode() {
     const sessionStartAt = sessionStartAtRef.current ?? Date.now();
     const durationSeconds = endedEarly
       ? Math.max(1, Math.round((Date.now() - sessionStartAt) / 1000))
-      : DEFAULT_SESSION_SECONDS;
+      : totalSessionSeconds;
 
     try {
       const result = await evaluatePresentationTestSession({
@@ -365,7 +370,7 @@ export default function ThesisPresentationTestMode() {
     setTranscriptExpanded(false);
     setQuestions([]);
     setCurrentQuestionIndex(0);
-    setTimeRemainingSeconds(DEFAULT_SESSION_SECONDS);
+    setTimeRemainingSeconds(totalSessionSeconds);
     setListeningDotCount(0);
     transcriptIdRef.current = 0;
     sessionStartAtRef.current = null;
@@ -393,10 +398,10 @@ export default function ThesisPresentationTestMode() {
       timerIntervalRef.current = window.setInterval(() => {
         const sessionStartAt = sessionStartAtRef.current ?? Date.now();
         const elapsedSeconds = Math.floor((Date.now() - sessionStartAt) / 1000);
-        const remainingSeconds = Math.max(0, DEFAULT_SESSION_SECONDS - elapsedSeconds);
+        const remainingSeconds = Math.max(0, totalSessionSeconds - elapsedSeconds);
         const nextQuestionIndex = Math.min(
           normalizedQuestions.length - 1,
-          Math.floor(elapsedSeconds / QUESTION_INTERVAL_SECONDS)
+          Math.floor(elapsedSeconds / selectedIntervalSeconds)
         );
 
         setTimeRemainingSeconds(remainingSeconds);
@@ -418,7 +423,7 @@ export default function ThesisPresentationTestMode() {
           : 'The test session could not be started.'
       );
     }
-  }, [clearTimerInterval, finishSession, startCapture, stopTracks, totalQuestions]);
+  }, [clearTimerInterval, finishSession, selectedIntervalSeconds, startCapture, stopTracks, totalQuestions, totalSessionSeconds]);
 
   useEffect(() => {
     if (sessionState !== 'running' || captureStatus !== 'Listening...') {
@@ -473,16 +478,44 @@ export default function ThesisPresentationTestMode() {
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5 text-xs text-neutral-600">
-            <span className="rounded-full border border-neutral-200 bg-white/90 px-4 py-2 shadow-sm">8 min</span>
-            <span className="rounded-full border border-neutral-200 bg-white/90 px-4 py-2 shadow-sm">8 questions</span>
-            <span className="rounded-full border border-neutral-200 bg-white/90 px-4 py-2 shadow-sm">AI feedback</span>
+          <div className="mt-4 flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-neutral-200 bg-white/90 px-5 py-5 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col gap-2 text-left">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Session duration</span>
+                <select
+                  value={selectedDurationMinutes}
+                  onChange={(event) => setSelectedDurationMinutes(Number(event.target.value))}
+                  className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                >
+                  {DURATION_OPTIONS_MINUTES.map((durationMinutes) => (
+                    <option key={durationMinutes} value={durationMinutes}>
+                      {durationMinutes} minute{durationMinutes === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-2 text-left">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Question interval</span>
+                <select
+                  value={selectedIntervalSeconds}
+                  onChange={(event) => setSelectedIntervalSeconds(Number(event.target.value))}
+                  className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                >
+                  {INTERVAL_OPTIONS_SECONDS.map((intervalSeconds) => (
+                    <option key={intervalSeconds} value={intervalSeconds}>
+                      Every {intervalSeconds} seconds
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={() => void startSession()}
-            className="mt-6 rounded-md border border-neutral-900 bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800"
+            className="mt-6 rounded-md border border-neutral-800 bg-neutral-800 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700"
           >
             Start Test Session
           </button>
@@ -515,12 +548,12 @@ export default function ThesisPresentationTestMode() {
       <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md bg-neutral-100 px-5 py-5 text-neutral-900">
 
         <div className="relative flex items-start justify-between gap-4">
-          <div className="rounded-xl border border-neutral-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+          <div className="rounded-md border border-neutral-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
             <p className="text-sm text-neutral-500">
               Question {Math.min(currentQuestionIndex + 1, questions.length)}/{questions.length}
             </p>
           </div>
-          <div className="rounded-xl border border-neutral-200 bg-white/95 px-4 py-3 text-right shadow-sm backdrop-blur">
+          <div className="rounded-md border border-neutral-200 bg-white/95 px-4 py-3 text-right shadow-sm backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
               Time Remaining
             </p>
@@ -531,7 +564,7 @@ export default function ThesisPresentationTestMode() {
         </div>
 
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center py-6">
-          <div className="w-full max-w-5xl rounded-[1.75rem] border border-neutral-200 bg-white px-10 py-10 text-center shadow-sm">
+          <div className="w-full max-w-5xl rounded-[0.6rem] border border-neutral-200 bg-white px-10 py-10 text-center shadow-sm">
             <h2 className="text-3xl font-semibold leading-tight tracking-tight text-neutral-900">
               {currentQuestion}
             </h2>
@@ -541,7 +574,7 @@ export default function ThesisPresentationTestMode() {
           </div>
         </div>
 
-        <div className="relative flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
+        <div className="relative flex items-center justify-between gap-4 rounded-md border border-neutral-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
           <p className="text-sm font-medium text-neutral-800">{listeningIndicator}</p>
           <button
             type="button"

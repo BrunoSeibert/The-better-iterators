@@ -32,11 +32,11 @@ export default function AchievementToast({ emoji, label, description, onDone }: 
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-4 rounded-2xl bg-neutral-900 px-5 py-4 shadow-2xl transition-all duration-500 ease-out ${
+      className={`pointer-events-auto flex items-center gap-4 rounded-2xl bg-neutral-800 px-5 py-4 shadow-2xl transition-all duration-500 ease-out ${
         visible ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
       }`}
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neutral-800 text-2xl">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neutral-700 text-2xl">
         {emoji}
       </div>
       <div className="flex-1">

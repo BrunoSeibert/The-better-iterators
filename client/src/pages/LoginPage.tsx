@@ -7,6 +7,17 @@ import { useAuthStore } from '../store/authStore';
 import * as authService from '../services/authService';
 import StudyondLogo from '../components/ui/StudyondLogo';
 
+const C = {
+  darkBrown:  'rgba(38,38,38,1)',
+  midBrown:   'rgba(82,82,91,1)',
+  tan:        'rgba(161,161,170,1)',
+  lightTan:   'rgba(228,228,231,1)',
+  cream:      'rgba(250,250,250,1)',
+  warmWhite:  'rgba(244,244,245,1)',
+  border:     'rgba(212,212,216,1)',
+  mutedText:  'rgba(113,113,122,1)',
+};
+
 const emailSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
@@ -26,6 +37,29 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 type RegisterForm = z.infer<typeof registerSchema>;
 
 type Step = 'email' | 'password' | 'register';
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  border: `2px solid ${C.border}`,
+  borderRadius: 16,
+  padding: '14px 20px',
+  fontSize: 15,
+  color: C.darkBrown,
+  backgroundColor: C.cream,
+  outline: 'none',
+};
+
+const primaryBtn: React.CSSProperties = {
+  width: '100%',
+  padding: '14px 0',
+  borderRadius: 16,
+  fontSize: 15,
+  fontWeight: 700,
+  backgroundColor: C.darkBrown,
+  color: C.cream,
+  border: 'none',
+  cursor: 'pointer',
+};
 
 export default function LoginPage() {
   const [step, setStep] = useState<Step>('email');
@@ -76,25 +110,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.warmWhite }}>
       <div className="w-full max-w-lg px-10 py-16 flex flex-col items-center">
 
-        {/* Logo */}
         <StudyondLogo className="h-10 w-auto mb-12" />
 
-        {/* Heading */}
-        <h1 className="ds-title-xl font-light text-[--foreground] mb-3 text-center">
+        <h1 className="text-3xl font-bold mb-3 text-center" style={{ color: C.darkBrown }}>
           {step === 'register' ? 'Sign up' : 'Welcome'}
         </h1>
 
-        <p className="ds-body text-center mb-10" style={{ color: 'var(--muted-foreground)', maxWidth: 360 }}>
+        <p className="text-sm text-center mb-10" style={{ color: C.mutedText, maxWidth: 360 }}>
           {step === 'register'
             ? 'Create your Studyond account.'
             : 'Log in to Studyond. The login is restricted to university and company email addresses.'}
         </p>
 
         {error && (
-          <p className="ds-small text-red-500 mb-4 text-center">{error}</p>
+          <p className="text-sm text-red-500 mb-4 text-center">{error}</p>
         )}
 
         {/* Email step */}
@@ -104,17 +136,12 @@ export default function LoginPage() {
               {...emailForm.register('email')}
               placeholder="Email address*"
               type="email"
-              className="w-full border rounded-2xl px-5 py-4 ds-body placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              style={{ borderColor: 'var(--border)' }}
+              style={inputStyle}
             />
             {emailForm.formState.errors.email && (
-              <p className="ds-caption text-red-500 mt-1">{emailForm.formState.errors.email.message}</p>
+              <p className="text-xs text-red-500 mt-1">{emailForm.formState.errors.email.message}</p>
             )}
-            <button
-              type="submit"
-              className="w-full py-4 rounded-2xl ds-label text-base transition hover:opacity-90"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            >
+            <button type="submit" style={primaryBtn}>
               Continue
             </button>
           </form>
@@ -123,29 +150,24 @@ export default function LoginPage() {
         {/* Password step */}
         {step === 'password' && (
           <form onSubmit={passwordForm.handleSubmit(handleLogin)} className="w-full space-y-4">
-            <p className="ds-small text-center" style={{ color: 'var(--muted-foreground)' }}>{email}</p>
+            <p className="text-sm text-center" style={{ color: C.mutedText }}>{email}</p>
             <input
               {...passwordForm.register('password')}
               placeholder="Password*"
               type="password"
-              className="w-full border rounded-2xl px-5 py-4 ds-body placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              style={{ borderColor: 'var(--border)' }}
+              style={inputStyle}
             />
             {passwordForm.formState.errors.password && (
-              <p className="ds-caption text-red-500 mt-1">{passwordForm.formState.errors.password.message}</p>
+              <p className="text-xs text-red-500 mt-1">{passwordForm.formState.errors.password.message}</p>
             )}
-            <button
-              type="submit"
-              className="w-full py-4 rounded-2xl ds-label text-base transition hover:opacity-90"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            >
+            <button type="submit" style={primaryBtn}>
               Log in
             </button>
             <button
               type="button"
               onClick={() => { setStep('email'); setError(''); }}
-              className="w-full ds-small hover:underline"
-              style={{ color: 'var(--muted-foreground)' }}
+              className="w-full text-sm hover:underline"
+              style={{ color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               ← Back
             </button>
@@ -158,63 +180,55 @@ export default function LoginPage() {
             <input
               {...registerForm.register('name')}
               placeholder="Full name*"
-              className="w-full border rounded-2xl px-5 py-4 ds-body placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              style={{ borderColor: 'var(--border)' }}
+              style={inputStyle}
             />
             {registerForm.formState.errors.name && (
-              <p className="ds-caption text-red-500 mt-1">{registerForm.formState.errors.name.message}</p>
+              <p className="text-xs text-red-500 mt-1">{registerForm.formState.errors.name.message}</p>
             )}
             <input
               {...registerForm.register('email')}
               placeholder="Email address*"
               type="email"
-              className="w-full border rounded-2xl px-5 py-4 ds-body placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              style={{ borderColor: 'var(--border)' }}
+              style={inputStyle}
             />
             {registerForm.formState.errors.email && (
-              <p className="ds-caption text-red-500 mt-1">{registerForm.formState.errors.email.message}</p>
+              <p className="text-xs text-red-500 mt-1">{registerForm.formState.errors.email.message}</p>
             )}
             <input
               {...registerForm.register('password')}
               placeholder="Password*"
               type="password"
-              className="w-full border rounded-2xl px-5 py-4 ds-body placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              style={{ borderColor: 'var(--border)' }}
+              style={inputStyle}
             />
             {registerForm.formState.errors.password && (
-              <p className="ds-caption text-red-500 mt-1">{registerForm.formState.errors.password.message}</p>
+              <p className="text-xs text-red-500 mt-1">{registerForm.formState.errors.password.message}</p>
             )}
-            <button
-              type="submit"
-              className="w-full py-4 rounded-2xl ds-label text-base transition hover:opacity-90"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
-            >
+            <button type="submit" style={primaryBtn}>
               Sign up
             </button>
             <button
               type="button"
               onClick={() => { setStep('email'); setError(''); }}
-              className="w-full ds-small hover:underline"
-              style={{ color: 'var(--muted-foreground)' }}
+              className="w-full text-sm hover:underline"
+              style={{ color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               ← Back
             </button>
           </form>
         )}
 
-        {/* Footer */}
         {step === 'email' && (
-          <p className="mt-8 ds-small" style={{ color: 'var(--muted-foreground)' }}>
+          <p className="mt-8 text-sm" style={{ color: C.mutedText }}>
             Don't have an account?{' '}
             <button
               onClick={() => {
-              const emailValue = emailForm.getValues('email');
-              if (emailValue) setEmail(emailValue);
-              setStep('register');
-              setError('');
-            }}
+                const emailValue = emailForm.getValues('email');
+                if (emailValue) setEmail(emailValue);
+                setStep('register');
+                setError('');
+              }}
               className="font-bold hover:underline"
-              style={{ color: 'var(--foreground)' }}
+              style={{ color: C.darkBrown, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               Sign up
             </button>

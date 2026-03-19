@@ -17,6 +17,7 @@ import LiteratureReview from '@/pages/LiteratureReview';
 import ResearchProposal from '@/pages/ResearchProposal';
 import ResearchWorkspace from '@/pages/ResearchWorkspace';
 import DailyCheckin from '@/components/DailyCheckin';
+import CompletionModal from '@/components/CompletionModal';
 import { DocumentReview } from '../document-review';
 import ThesisPresentationTestMode from '../presentation-test/ThesisPresentationTestMode';
 import studyonLogo from '@/assets/Study_Logo.png';
@@ -129,6 +130,13 @@ export default function Layout() {
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [checkinDone, setCheckinDone] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return false;
+      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
+    } catch { return false; }
+  });
 
   const [checkinOpen, setCheckinOpen] = useState(() => {
     try {
@@ -145,8 +153,11 @@ export default function Layout() {
       return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
     } catch { return true; }
   });
+  const [completionModal, setCompletionModal] = useState<{ level: number; value: string } | null>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+
   const prevUnlockedRef = useRef<Set<string>>(new Set());
-  const isInitializedRef = useRef(false); 
+  const isInitializedRef = useRef(false);
 
   const queueHeart = useCallback((heart: HeartParticle) => {
     setHearts((currentHearts) => [...currentHearts, heart]);
@@ -325,6 +336,33 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const unlockedLevel = (e as CustomEvent<{ unlockedLevel: number }>).detail?.unlockedLevel;
+      setLevelUpNumber(unlockedLevel ?? null);
+      setLevelUpExiting(false);
+      setShowLevelUp(true);
+      if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+      levelUpTimeoutRef.current = window.setTimeout(() => {
+        setLevelUpExiting(true);
+        window.setTimeout(() => {
+          setShowLevelUp(false);
+          setLevelUpExiting(false);
+          levelUpTimeoutRef.current = null;
+        }, 400);
+      }, 1500);
+    };
+    window.addEventListener('level-up', handler);
+    return () => window.removeEventListener('level-up', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!completionModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompletionModal(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completionModal]);
+
+  useEffect(() => {
     if (!assistantOpen) {
       setHearts([]);
       heartTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -468,6 +506,39 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
+  const handleMarkComplete = async () => {
+    if (!completionModal) return;
+    const { level, value } = completionModal;
+    if ([1, 2, 3].includes(level) && !value.trim()) return;
+    setCompletionLoading(true);
+    try {
+      const result = await authService.completeLevel(level);
+      if ([1, 2, 3].includes(level)) {
+        await authService.setLevelMetadata(level, value.trim());
+      }
+      setCompletionModal(null);
+      const refreshedState = await applyLevelState(result.user);
+      setLevelUpNumber(refreshedState.unlockedLevel);
+      setLevelUpExiting(false);
+      setShowLevelUp(true);
+      if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+      levelUpTimeoutRef.current = window.setTimeout(() => {
+        setLevelUpExiting(true);
+        window.setTimeout(() => {
+          setShowLevelUp(false);
+          setLevelUpExiting(false);
+          levelUpTimeoutRef.current = null;
+        }, 400);
+      }, 1500);
+    } finally {
+      setCompletionLoading(false);
+    }
+  };
+
+  const handleCheckinButtonClick = () => {
+    setCheckinOpen(true);
+  };
+
 const closeAssistant = () => {
     const source = assistantBadgerRef.current?.getBoundingClientRect();
     const target = badgerButtonSlotRef.current?.getBoundingClientRect();
@@ -540,32 +611,32 @@ const closeAssistant = () => {
           <div
             className="flex flex-col items-center gap-5 px-14 py-10 text-center"
             style={{
-              backgroundColor: 'rgba(252,248,243,1)',
-              border: '1px solid rgba(196,177,160,1)',
+              backgroundColor: 'rgba(250,250,250,1)',
+              border: '2px solid rgba(212,212,216,1)',
               borderRadius: 18,
-              boxShadow: '0 8px 40px rgba(81,60,45,0.22)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
               animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards',
             }}
           >
             <div
               className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{ backgroundColor: 'rgba(81,60,45,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}
+              style={{ backgroundColor: 'rgba(38,38,38,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}
             >
-              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(252,248,243,1)' }}>
+              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(250,250,250,1)' }}>
                 <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
               </svg>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(140,115,95,1)' }}>Congratulations</p>
-              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(81,60,45,1)' }}>One step closer to your thesis</p>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(113,113,122,1)' }}>Congratulations</p>
+              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(38,38,38,1)' }}>One step closer to your thesis</p>
               {levelUpNumber && (
-                <p className="mt-2 text-sm" style={{ color: 'rgba(140,115,95,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>
+                <p className="mt-2 text-sm" style={{ color: 'rgba(113,113,122,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>
               )}
             </div>
           </div>
         </div>
       )}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-neutral-800 px-4 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
@@ -605,18 +676,15 @@ const closeAssistant = () => {
           >
             Reset Level
           </button>
-          {completedStages.length < levels.length && (
-            <button
-              type="button"
-              onClick={() => updateLevel('progress')}
-              disabled={levelLoading}
-              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Progress Level
-            </button>
-          )}
         </div>
         <div className="ml-auto flex items-center gap-2">
+        
+          <button
+            onClick={handleCheckinButtonClick}
+            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
+          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
@@ -719,6 +787,19 @@ const closeAssistant = () => {
             </div>
           </div>
 
+          {completedStages.length < levels.length && !completedStages.includes(activeLevel) && (
+            <div className="flex items-center justify-end bg-neutral-100 border-b border-neutral-200 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setCompletionModal({ level: activeLevel, value: '' })}
+                disabled={levelLoading}
+                className="rounded-full border border-neutral-300 bg-white px-4 py-1.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Mark complete ✓
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div
               className={`flex min-h-full flex-1 overflow-y-auto rounded-md p-3 ${
@@ -727,7 +808,7 @@ const closeAssistant = () => {
             >
               {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
-              {activeLevel === 3 && <ResearchProposal />}
+              {activeLevel === 3 && <ResearchProposal onMarkComplete={() => setCompletionModal({ level: 3, value: '' })} />}
               {activeLevel === 4 && <ResearchWorkspace />}
               {activeLevel === 5 && (
                 levelSixCorrecting ? (
@@ -881,37 +962,48 @@ const closeAssistant = () => {
         ))}
       </div>
 
+      {completionModal !== null && (
+        <CompletionModal
+          level={completionModal.level}
+          value={completionModal.value}
+          loading={completionLoading}
+          onChange={(v) => setCompletionModal({ level: completionModal.level, value: v })}
+          onConfirm={handleMarkComplete}
+          onClose={() => setCompletionModal(null)}
+        />
+      )}
+
       {/* Daily check-in modal */}
       {checkinOpen && !checkinVerifying && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }}
+          style={{ backgroundColor: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(3px)' }}
           onClick={() => setCheckinOpen(false)}
         >
           <div
             className="relative w-full mx-4 overflow-y-auto"
             style={{
               maxWidth: 600, maxHeight: '90vh',
-              backgroundColor: 'rgba(252,248,243,1)',
-              border: '1px solid rgba(196,177,160,1)',
+              backgroundColor: 'rgba(250,250,250,1)',
+              border: '2px solid rgba(212,212,216,1)',
               borderRadius: 14,
               padding: '2rem',
-              boxShadow: '0 8px 40px rgba(81,60,45,0.18)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.1)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(140,115,95,1)' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(113,113,122,1)' }}>
                 Daily check-in
               </p>
               <button
                 onClick={() => setCheckinOpen(false)}
-                style={{ fontSize: 16, color: 'rgba(140,115,95,1)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}
+                style={{ fontSize: 16, color: 'rgba(113,113,122,1)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}
               >
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => {}} />
+            <DailyCheckin onComplete={() => { setCheckinDone(true); }} />
           </div>
         </div>
       )}

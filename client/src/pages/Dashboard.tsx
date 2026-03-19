@@ -1,24 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getDashboard, updateMainDeadline, createTodo, toggleTodo, deleteTodo,
+  getDashboard, updateMainDeadline, createTodo, toggleTodo, deleteTodo, completeLevel,
+  getLevelMetadata, setLevelMetadata,
   type DashboardData, type Todo, type DashboardDeadlines,
 } from '@/services/authService';
 import { useAuthStore } from '@/store/authStore';
 import { peekStreakSummary } from '@/services/authService';
 import DailyCheckin from '@/components/DailyCheckin';
+import CompletionModal from '@/components/CompletionModal';
 import studyonLogo from '@/assets/Study_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 
 const C = {
-  darkBrown:  'rgba(81,60,45,1)',
-  midBrown:   'rgba(114,96,84,1)',
-  tan:        'rgba(197,171,146,1)',
-  lightTan:   'rgba(231,214,194,1)',
-  cream:      'rgba(252,248,243,1)',
-  warmWhite:  'rgba(245,239,231,1)',
-  border:     'rgba(196,177,160,1)',
-  mutedText:  'rgba(140,115,95,1)',
+  darkBrown:  'rgba(38,38,38,1)',
+  midBrown:   'rgba(82,82,91,1)',
+  tan:        'rgba(161,161,170,1)',
+  lightTan:   'rgba(228,228,231,1)',
+  cream:      'rgba(250,250,250,1)',
+  warmWhite:  'rgba(244,244,245,1)',
+  border:     'rgba(212,212,216,1)',
+  mutedText:  'rgba(113,113,122,1)',
+  success:    'rgba(163,204,96,1)',
+  successSoft:'rgba(234,247,202,0.95)',
 };
 
 const LEVEL_NAMES: Record<number, string> = {
@@ -63,14 +67,56 @@ export default function Dashboard() {
   const [deadlineInput, setDeadlineInput] = useState('');
   const streak = peekStreakSummary()?.currentStreak ?? 0;
 
-  const [checkinDone, setCheckinDone] = useState(() => {
-    try {
-      const raw = localStorage.getItem('todayCheckin');
-      if (!raw) return false;
-      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
-    } catch { return false; }
-  });
   const [checkinOpen, setCheckinOpen] = useState(false);
+
+  const [completionModal, setCompletionModal] = useState<{ level: number; value: string } | null>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+  const [levelUpNumber, setLevelUpNumber] = useState<number | null>(null);
+  const [levelUpVisible, setLevelUpVisible] = useState(false);
+  const [levelUpExiting, setLevelUpExiting] = useState(false);
+  const levelUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showLevelUpAnimation = (unlockedLevel: number) => {
+    if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
+    setLevelUpNumber(unlockedLevel);
+    setLevelUpExiting(false);
+    setLevelUpVisible(true);
+    levelUpTimerRef.current = setTimeout(() => {
+      setLevelUpExiting(true);
+      setTimeout(() => { setLevelUpVisible(false); setLevelUpExiting(false); }, 400);
+    }, 1500);
+  };
+  const [subtitles, setSubtitles] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    getLevelMetadata().then((meta) => setSubtitles(meta as Record<number, string>)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!completionModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompletionModal(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completionModal]);
+
+  const handleMarkComplete = async () => {
+    if (!completionModal || !data) return;
+    const { level, value } = completionModal;
+    if ([1, 2, 3].includes(level) && !value.trim()) return;
+    setCompletionLoading(true);
+    try {
+      const result = await completeLevel(level);
+      if ([1, 2, 3].includes(level)) {
+        await setLevelMetadata(level, value.trim());
+        setSubtitles((prev) => ({ ...prev, [level]: value.trim() }));
+      }
+      setData((prev) => prev ? { ...prev, user: result.user } : prev);
+      setCompletionModal(null);
+      showLevelUpAnimation(result.user.currentLevel);
+    } finally {
+      setCompletionLoading(false);
+    }
+  };
 
   useEffect(() => {
     getDashboard().then((d) => { setData(d); setLoading(false); }).catch(() => setLoading(false));
@@ -123,8 +169,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center" style={{ backgroundColor: C.warmWhite }}>
-        <div className="h-6 w-6 animate-spin rounded-full border-2" style={{ borderColor: C.border, borderTopColor: C.darkBrown }} />
+      <div className="flex h-screen w-full items-center justify-center bg-neutral-100">
+        <div className="h-6 w-6 animate-spin rounded-full border-2" style={{ borderColor: 'rgba(212,212,216,1)', borderTopColor: 'rgba(38,38,38,1)' }} />
       </div>
     );
   }
@@ -147,42 +193,31 @@ export default function Dashboard() {
   );
 
   const card = (children: React.ReactNode, style?: React.CSSProperties) => (
-    <div style={{ backgroundColor: C.cream, border: `1px solid ${C.border}`, borderRadius: 12, padding: '1.25rem', ...style }}>
+    <div style={{ backgroundColor: C.cream, border: `2px solid ${C.border}`, borderRadius: 12, padding: '1.25rem', ...style }}>
       {children}
     </div>
   );
 
   return (
-    <div className="min-h-screen pb-16" style={{ backgroundColor: C.warmWhite }}>
+    <div className="min-h-screen bg-neutral-100 pb-16">
       {/* Navbar */}
-      <header className="sticky top-0 z-30 flex h-[max(10vh,72px)] items-center gap-4 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: C.darkBrown, borderBottom: `1px solid rgba(56,40,29,1)` }}>
+      <header className="sticky top-0 z-30 flex h-[max(10vh,72px)] items-center gap-4 border-b border-neutral-700 bg-neutral-800 px-4 sm:px-6 lg:px-8">
         <img src={studyonLogo} alt="Studyon logo" className="h-12 w-12 object-contain brightness-0 invert shrink-0" />
         <div className="flex items-center gap-3">
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.tan }}>Dashboard</p>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(212,212,216,1)' }}>Dashboard</p>
           <button
             onClick={() => navigate('/app')}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
-            style={{ color: C.lightTan, border: `1px solid rgba(120,90,68,1)` }}
+            style={{ color: 'rgba(229,229,229,1)', border: '2px solid rgba(82,82,91,1)' }}
           >
             Workspace →
           </button>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <button
-            onClick={() => !checkinDone && setCheckinOpen(true)}
-            disabled={checkinDone}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-            style={checkinDone
-              ? { backgroundColor: 'rgba(152,195,121,0.25)', color: 'rgba(180,220,140,1)', border: '1px solid rgba(152,195,121,0.4)', cursor: 'default' }
-              : { backgroundColor: C.lightTan, color: C.darkBrown, border: `1px solid ${C.tan}` }
-            }
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
-          <button
             onClick={() => navigate('/profile', { state: { returnTo: '/dashboard' } })}
             className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition"
-            style={{ color: C.tan, border: `1px solid rgba(120,90,68,1)` }}
+            style={{ color: 'rgba(212,212,216,1)', border: '2px solid rgba(82,82,91,1)' }}
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
               <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z"/>
@@ -194,15 +229,48 @@ export default function Dashboard() {
 
       {/* Check-in modal */}
       {checkinOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }} onClick={() => setCheckinOpen(false)}>
-          <div className="relative mx-4 w-full overflow-y-auto" style={{ maxWidth: 600, maxHeight: '90vh', backgroundColor: C.cream, border: `1px solid ${C.border}`, borderRadius: 14, padding: '2rem', boxShadow: '0 8px 40px rgba(81,60,45,0.18)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(3px)' }} onClick={() => setCheckinOpen(false)}>
+          <div className="relative mx-4 w-full overflow-y-auto" style={{ maxWidth: 600, maxHeight: '90vh', backgroundColor: C.cream, border: `2px solid ${C.border}`, borderRadius: 14, padding: '2rem', boxShadow: '0 8px 40px rgba(24,24,27,0.16)' }} onClick={(e) => e.stopPropagation()}>
             <div className="mb-6 flex items-center justify-between">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.mutedText }}>Daily check-in</p>
               <button onClick={() => setCheckinOpen(false)} style={{ fontSize: 16, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
             </div>
-            <DailyCheckin onComplete={() => { setCheckinDone(true); setCheckinOpen(false); }} />
+            <DailyCheckin onComplete={() => {}} />
           </div>
         </div>
+      )}
+
+      {/* Level-up animation */}
+      {levelUpVisible && (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', animation: 'levelup-backdrop-in 0.3s ease forwards' }}>
+          <div className="flex flex-col items-center gap-5 px-14 py-10 text-center"
+            style={{ backgroundColor: 'rgba(252,248,243,1)', border: '1px solid rgba(196,177,160,1)', borderRadius: 18, boxShadow: '0 8px 40px rgba(81,60,45,0.22)', animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'rgba(81,60,45,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}>
+              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(252,248,243,1)' }}>
+                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(140,115,95,1)' }}>Congratulations</p>
+              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(81,60,45,1)' }}>One step closer to your thesis</p>
+              {levelUpNumber && <p className="mt-2 text-sm" style={{ color: 'rgba(140,115,95,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark complete modal */}
+      {completionModal !== null && (
+        <CompletionModal
+          level={completionModal.level}
+          value={completionModal.value}
+          loading={completionLoading}
+          onChange={(v) => setCompletionModal({ level: completionModal.level, value: v })}
+          onConfirm={handleMarkComplete}
+          onClose={() => setCompletionModal(null)}
+        />
       )}
 
       <div className="mx-auto max-w-4xl px-4 pt-8 flex flex-col gap-6">
@@ -220,7 +288,7 @@ export default function Dashboard() {
             { label: 'until submission', value: daysToDeadline !== null ? (daysToDeadline < 0 ? `${Math.abs(daysToDeadline)}d late` : `${daysToDeadline}d`) : '—' },
             { label: 'levels done',      value: `${completedStages.length}/6` },
           ].map(({ label, value }) => (
-            <div key={label} className="text-center rounded-xl py-3 px-2" style={{ backgroundColor: C.cream, border: `1px solid ${C.border}` }}>
+            <div key={label} className="text-center rounded-xl py-3 px-2" style={{ backgroundColor: C.cream, border: `2px solid ${C.border}` }}>
               <p style={{ fontSize: 18, fontWeight: 700, color: C.darkBrown }}>{value}</p>
               <p style={{ fontSize: 11, color: C.mutedText, marginTop: 2 }}>{label}</p>
             </div>
@@ -243,8 +311,8 @@ export default function Dashboard() {
                   key={level}
                   onClick={() => goToLevel(level)}
                   style={{
-                    backgroundColor: completed ? 'rgba(220,240,200,0.5)' : C.cream,
-                    border: `1px solid ${completed ? 'rgba(152,195,121,0.6)' : C.border}`,
+                    backgroundColor: completed ? C.successSoft : C.cream,
+                    border: `2px solid ${completed ? C.success : C.border}`,
                     borderRadius: 12,
                     padding: '1rem',
                     cursor: unlocked ? 'pointer' : 'not-allowed',
@@ -256,14 +324,19 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between mb-2">
                     <span style={{
                       fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '2px 10px',
-                      backgroundColor: completed ? 'rgba(152,195,121,0.3)' : isCurrent ? C.darkBrown : C.lightTan,
-                      color: completed ? 'rgba(60,120,30,1)' : isCurrent ? C.cream : C.mutedText,
+                      backgroundColor: completed ? 'rgba(163,204,96,0.22)' : isCurrent ? C.darkBrown : C.lightTan,
+                      color: completed ? 'rgba(95,128,39,1)' : isCurrent ? C.cream : C.mutedText,
                     }}>
                       {completed ? '✓ Done' : isCurrent ? 'Current' : 'Locked'}
                     </span>
                     <span style={{ fontSize: 11, color: C.mutedText }}>Level {level}</span>
                   </div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: C.darkBrown }}>{LEVEL_NAMES[level]}</p>
+                  {subtitles[level] && (
+                    <p style={{ fontSize: 11, color: C.mutedText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {subtitles[level]}
+                    </p>
+                  )}
                   {levelDeadlineMap[level] && !completed && (
                     <div className="mt-1.5 flex items-center gap-1.5">
                       <DeadlinePill days={days} />
@@ -271,6 +344,18 @@ export default function Dashboard() {
                     </div>
                   )}
                   {!unlocked && <p style={{ fontSize: 11, color: C.mutedText, marginTop: 4 }}>Complete previous levels first</p>}
+                  {isCurrent && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCompletionModal({ level, value: '' }); }}
+                      style={{
+                        marginTop: 10, fontSize: 11, fontWeight: 700, padding: '4px 12px',
+                        borderRadius: 99, border: `1px solid ${C.tan}`,
+                        background: C.lightTan, color: C.darkBrown, cursor: 'pointer',
+                      }}
+                    >
+                      Mark complete
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -307,11 +392,11 @@ export default function Dashboard() {
                   onChange={(e) => setDeadlineInput(e.target.value)}
                   min={new Date().toISOString().slice(0, 10)}
                   className="w-full focus:outline-none"
-                  style={{ backgroundColor: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 14px', fontSize: 14, color: C.darkBrown, marginBottom: 10 }}
+                  style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, borderRadius: 8, padding: '9px 14px', fontSize: 14, color: C.darkBrown, marginBottom: 10 }}
                 />
                 <div className="flex gap-2">
                   <button onClick={handleDeadlineSave} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}>Save</button>
-                  <button onClick={() => setEditingDeadline(false)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, color: C.mutedText, background: 'none', border: `1px solid ${C.border}`, cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={() => setEditingDeadline(false)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, color: C.mutedText, background: 'none', border: `2px solid ${C.border}`, cursor: 'pointer' }}>Cancel</button>
                 </div>
               </>)}
 
@@ -372,8 +457,8 @@ export default function Dashboard() {
               <div key={todo.id} className="group flex items-center gap-3" style={{ marginBottom: 8 }}>
                 <button onClick={() => handleToggle(todo)} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   <div style={{
-                    height: 20, width: 20, borderRadius: '50%', border: `2px solid ${todo.done ? 'rgba(100,180,60,1)' : C.border}`,
-                    backgroundColor: todo.done ? 'rgba(100,180,60,1)' : 'transparent',
+                    height: 20, width: 20, borderRadius: '50%', border: `2px solid ${todo.done ? C.success : C.border}`,
+                    backgroundColor: todo.done ? C.success : 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease',
                   }}>
                     {todo.done && <svg viewBox="0 0 24 24" style={{ height: 12, width: 12, fill: C.cream }}><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
@@ -383,7 +468,7 @@ export default function Dashboard() {
                 {todo.level_link && (
                   <span
                     onClick={() => goToLevel(todo.level_link!)}
-                    style={{ flexShrink: 0, cursor: 'pointer', borderRadius: 99, padding: '2px 10px', fontSize: 11, color: C.mutedText, backgroundColor: C.lightTan, border: `1px solid ${C.border}` }}
+                    style={{ flexShrink: 0, cursor: 'pointer', borderRadius: 99, padding: '2px 10px', fontSize: 11, color: C.mutedText, backgroundColor: C.lightTan, border: `2px solid ${C.border}` }}
                   >
                     Level {todo.level_link}
                   </span>
@@ -399,13 +484,13 @@ export default function Dashboard() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTodo()}
                 placeholder="Add a task…"
                 className="flex-1 focus:outline-none"
-                style={{ backgroundColor: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, color: C.darkBrown }}
+                  style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, color: C.darkBrown }}
               />
               <select
                 value={newTodoLevel}
                 onChange={(e) => setNewTodoLevel(e.target.value ? Number(e.target.value) : '')}
                 className="focus:outline-none"
-                style={{ backgroundColor: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, color: C.mutedText }}
+                style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, color: C.mutedText }}
               >
                 <option value="">No level</option>
                 {[1, 2, 3, 4, 5, 6].map((l) => <option key={l} value={l}>Level {l}</option>)}

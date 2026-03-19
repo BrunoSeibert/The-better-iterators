@@ -99,7 +99,7 @@ const DEFAULT_STATE: ProposalState = {
 };
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function ResearchProposal() {
+export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: () => void } = {}) {
   const userId = useAuthStore((s) => s.user?.id ?? 'anon');
   const k = (key: string) => `${userId}:${key}`;
 
@@ -235,7 +235,10 @@ export default function ResearchProposal() {
   };
 
   const copyProposal = () => {
-    if (state.finalProposal) navigator.clipboard.writeText(`# ${state.finalProposal.title}\n\n${state.finalProposal.body}`);
+    if (state.finalProposal) {
+      navigator.clipboard.writeText(`# ${state.finalProposal.title}\n\n${state.finalProposal.body}`);
+      onMarkComplete?.();
+    }
   };
 
   const resetProposal = () => {

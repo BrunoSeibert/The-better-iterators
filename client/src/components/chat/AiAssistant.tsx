@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { getLevelMetadata } from '@/services/authService';
 
 
 interface Message {
@@ -54,6 +55,13 @@ export default function AiAssistant() {
         } catch { return undefined; }
       })();
 
+      const thesisMeta: Record<string, string> = await getLevelMetadata().catch(() => ({}));
+      const thesisContext = [
+        thesisMeta['1'] ? `Thesis topic: ${thesisMeta['1']}` : null,
+        thesisMeta['2'] ? `Advisor: ${thesisMeta['2']}` : null,
+        thesisMeta['3'] ? `Research question: ${thesisMeta['3']}` : null,
+      ].filter(Boolean).join('\n') || undefined;
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -64,6 +72,7 @@ export default function AiAssistant() {
           messages: newMessages,
           conversationId,
           checkinContext,
+          thesisContext,
         }),
       });
       const data = await res.json();

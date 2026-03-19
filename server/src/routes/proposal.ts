@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -30,6 +31,8 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 - Degree: ${user?.degree_type ?? 'not specified'}
 - Research interests: ${fieldNames.length > 0 ? fieldNames.join(', ') : 'not specified'}`;
 
+    const thesisCtx = await getThesisContext(userId);
+
     // Phase: topic-feedback — validate and critique the chosen topic
     if (phase === 'topic-feedback') {
       const { topicTitle, topicDescription, messages = [] } = req.body as {
@@ -42,7 +45,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 
       const systemPrompt = `You are a thesis advisor helping a student evaluate their research topic. Be honest, constructive, and specific.
 
-${userContext}
+${userContext}${thesisCtx}
 
 The student's chosen topic:
 Title: "${topicTitle}"${topicDescription ? `\nDescription: "${topicDescription}"` : ''}
@@ -113,7 +116,7 @@ Respond ONLY with valid JSON:
 
       const systemPrompt = `You are a thesis advisor reviewing a student's research proposal section by section. Be specific and actionable.
 
-${userContext}
+${userContext}${thesisCtx}
 ${sectionContext ? `\nOther sections already written:\n${sectionContext}` : ''}
 
 Now reviewing the "${section}" section.
@@ -156,7 +159,7 @@ Respond ONLY with valid JSON:
         messages: [
           {
             role: 'system',
-            content: `You are a professional academic writing assistant. Assemble a clean, concise research proposal from the student's inputs. Write it in formal academic language, in first person. Make it read as a coherent document — not just joined paragraphs. Keep it to ~400 words.
+            content: `You are a professional academic writing assistant. Assemble a clean, concise research proposal from the student's inputs. Write it in formal academic language, in first person. Make it read as a coherent document — not just joined paragraphs. Keep it to ~400 words.${thesisCtx}
 
 Respond ONLY with valid JSON:
 {
