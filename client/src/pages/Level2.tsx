@@ -31,7 +31,6 @@ function buildPopupContent(match: MapMatch) {
     <div style="min-width: 200px; color: #2f2f2f;">
       <b>${match.name}</b><br/>
       <small style="color: #7a7a7a;">${match.type}</small><br/>
-      ${match.description ? `<small style="color: #555;">${match.description}</small><br/>` : ''}
       <div style="margin-top: 8px; color: #4a4a4a; font-weight: 700;">
         ${(match.match * 100).toFixed(0)}% Match
       </div>
