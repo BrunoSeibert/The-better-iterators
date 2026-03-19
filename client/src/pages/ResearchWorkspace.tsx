@@ -390,7 +390,7 @@ function TabContent({ tab, onAddToLibrary }: { tab: Tab; onAddToLibrary: (paper:
   return null;
 }
 
-function FindPapersResult({ papers, onAddToLibrary }: { papers: FoundPaper[]; onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void> }) {
+export function LegacyFindPapersResult({ papers, onAddToLibrary }: { papers: any[]; onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void> }) {
   const [added, setAdded] = useState<Set<number>>(new Set());
   return (
     <div className="flex flex-col gap-3">
@@ -420,6 +420,52 @@ function FindPapersResult({ papers, onAddToLibrary }: { papers: FoundPaper[]; on
             {added.has(i) ? '✓ In library' : '+ Add to library'}
           </button>
         </div>
+      ))}
+    </div>
+  );
+}
+
+function FindPapersResult({ papers, onAddToLibrary }: { papers: FoundPaper[]; onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void> }) {
+  const [added, setAdded] = useState<Set<number>>(new Set());
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionLabel>Paper Lookup</SectionLabel>
+      {papers.map((paper, index) => (
+        paper.status === 'found' ? (
+          <div key={index} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="font-semibold leading-snug text-neutral-900">{paper.title}</p>
+                <p className="mt-0.5 text-xs text-neutral-400">{paper.authors.join(', ')}</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                High confidence
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-neutral-600">{paper.summary}</p>
+            <button
+              onClick={async () => {
+                await onAddToLibrary({ title: paper.title, authors: paper.authors.join(', ') });
+                setAdded((current) => new Set(current).add(index));
+              }}
+              disabled={added.has(index)}
+              className="mt-3 rounded-lg border border-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-40"
+            >
+              {added.has(index) ? 'âœ“ In library' : '+ Add to library'}
+            </button>
+          </div>
+        ) : (
+          <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-semibold text-amber-900">No reliable paper match found</p>
+              <span className="shrink-0 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                Low confidence
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-amber-800">{paper.reason}</p>
+          </div>
+        )
       ))}
     </div>
   );
