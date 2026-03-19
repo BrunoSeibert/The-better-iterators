@@ -129,7 +129,7 @@ export default function AiAssistant() {
         <button
           onClick={sendMessage}
           disabled={loading || !input.trim()}
-          className="rounded-[0.32rem] border-2 border-[rgba(81,60,45,1)] bg-[rgba(197,171,146,1)] px-4 py-2 text-sm font-medium text-[rgba(81,60,45,1)] transition hover:bg-[rgba(189,163,138,1)] hover:text-[rgba(63,46,33,1)] disabled:opacity-30"
+          className="rounded-[0.32rem] border-2 border-[rgba(214,146,52,1)] bg-[rgba(247,187,96,1)] px-4 py-2 text-sm font-medium text-[rgba(102,60,8,1)] transition hover:bg-[rgba(240,176,80,1)] hover:text-[rgba(84,47,4,1)] disabled:opacity-30"
         >
           Send
         </button>

@@ -111,68 +111,36 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+type TopicListItem = {
+  id: string;
+  title: string;
+  description: string;
+  employment: string;
+  employmentType: string | null;
+  workplaceType: string | null;
+  degrees: string[];
+  companyId: string;
+  universityName: string | null;
+};
+
 export async function getTopicsAllUniversities() {
   const res = await api.get('/topics/by-university?alluniversities=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicsFromOtherUniversities() {
   const res = await api.get('/topics/by-university?other=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getAllTopics() {
   const res = await api.get('/topics/by-university?all=true&global=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicsByUniversity(all = false) {
   const res = await api.get(all ? '/topics/by-university?all=true' : '/topics/by-university');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicById(id: string) {
@@ -255,8 +223,14 @@ export type TopicSuggestion = {
   title: string;
   description: string;
   field_names: string[];
+  universityName: string | null;
   reason: string;
 };
+
+export async function getTopicsSimilarFromOthers(topicIds: string[]) {
+  const res = await api.get(`/topics/by-university?other=true&fromTopicIds=${topicIds.join(',')}`);
+  return res.data as { topics: TopicListItem[] };
+}
 
 export async function literatureSuggestTopics(
   papers: PaperAnalysis[],
