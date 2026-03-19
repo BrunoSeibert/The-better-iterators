@@ -24,6 +24,8 @@ import dataRoutes from './routes/data';
 import { reviewRouter } from './routes/review';
 import topicsRoutes from './routes/topics';
 import literatureRoutes from './routes/literature';
+import mapRoutes from './routes/map';
+app.use('/api/map', mapRoutes);
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);

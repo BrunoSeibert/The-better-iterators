@@ -16,7 +16,12 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@types/leaflet": "^1.9.21",
     "katex": "^0.16.38",
+    "leaflet": "^1.9.4",
+    "leaflet-defaulticon-compatibility": "^0.1.2",
+    "leaflet.markercluster": "^1.5.3",
+    "react-leaflet": "^3.2.5",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
