@@ -4,6 +4,7 @@ import {
   type DragEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -11,9 +12,10 @@ import {
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
-import Level1 from '@/pages/Level1';
 import Level2 from '@/pages/Level2';
 import LiteratureReview from '@/pages/LiteratureReview';
+import ResearchProposal from '@/pages/ResearchProposal';
+import DailyCheckin from '@/components/DailyCheckin';
 import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
@@ -23,7 +25,7 @@ import AchievementToast from '../AchievementToast';
 import { BADGES } from '@/utils/badges';
 
 
-const levels = Array.from({ length: 7 }, (_, index) => index + 1);
+const levels = Array.from({ length: 6 }, (_, index) => index + 1);
 const topbarHeight = 'max(10vh, 72px)';
 const assistantPanelWidth = 'clamp(320px, 32vw, 380px)';
 
@@ -34,9 +36,21 @@ type RectState = {
   height: number;
 };
 
+type HeartParticle = {
+  id: number;
+  left: number;
+  top: number;
+  size: number;
+  duration: number;
+  delay: number;
+  driftX: number;
+  driftY: number;
+  scaleTo: number;
+};
+
 
 const UNLOCK_DEPS: Record<number, number[]> = {
-  1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
+  1: [], 2: [], 3: [1, 2], 4: [3], 5: [4], 6: [5],
 };
 
 function isLevelUnlocked(level: number, completedStages: number[]) {
@@ -67,14 +81,18 @@ export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
-  const completedStages = user?.completedStages ?? [];
-  const preferredActiveLevel = getPreferredActiveLevel(user?.currentLevel, completedStages);
-  const furthestUnlockedLevel = getFurthestUnlockedLevel(completedStages);
-  const [activeLevel, setActiveLevel] = useState(preferredActiveLevel);
+  const completedStages = useMemo(() => user?.completedStages ?? [], [user?.completedStages]);
+  const preferredActiveLevel = useMemo(() => getPreferredActiveLevel(user?.currentLevel, completedStages), [user?.currentLevel, completedStages]);
+  const furthestUnlockedLevel = useMemo(() => getFurthestUnlockedLevel(completedStages), [completedStages]);
+  const [activeLevel, setActiveLevel] = useState(() => {
+    const stored = sessionStorage.getItem('activeLevel');
+    if (stored) return parseInt(stored, 10);
+    return preferredActiveLevel;
+  });
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [dailyStreak, setDailyStreak] = useState(0);
+  const [dailyStreak, setDailyStreak] = useState<number | null>(() => authService.peekStreakSummary()?.currentStreak ?? null);
   const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
   const [levelSixDragging, setLevelSixDragging] = useState(false);
   const [levelSixCorrecting, setLevelSixCorrecting] = useState(false);
@@ -88,8 +106,12 @@ export default function Layout() {
   const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
   const badgerButtonSlotRef = useRef<HTMLDivElement | null>(null);
   const assistantBadgerRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => { sessionStorage.setItem('activeLevel', String(activeLevel)); }, [activeLevel]);
+
   const badgerTransitionTimeoutRef = useRef<number | null>(null);
   const levelUpTimeoutRef = useRef<number | null>(null);
+  const heartTimeoutsRef = useRef<number[]>([]);
+  const heartIdRef = useRef(0);
   const dragState = useRef({
     isDragging: false,
     startX: 0,
@@ -97,12 +119,73 @@ export default function Layout() {
   });
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
+  const [hearts, setHearts] = useState<HeartParticle[]>([]);
+
+  const [checkinDone, setCheckinDone] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return false;
+      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
+    } catch { return false; }
+  });
+  const [checkinOpen, setCheckinOpen] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return true;
+      return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
+    } catch { return true; }
+  });
   const prevUnlockedRef = useRef<Set<string>>(new Set());
   const isInitializedRef = useRef(false); 
 
-  const refreshLevelState = useCallback(
-    async (requestedActiveLevel?: number) => {
-      const { user: refreshedUser } = await authService.me();
+  const queueHeart = useCallback((heart: HeartParticle) => {
+    setHearts((currentHearts) => [...currentHearts, heart]);
+
+    const timeoutId = window.setTimeout(() => {
+      setHearts((currentHearts) => currentHearts.filter((currentHeart) => currentHeart.id !== heart.id));
+      heartTimeoutsRef.current = heartTimeoutsRef.current.filter((id) => id !== timeoutId);
+    }, heart.duration + heart.delay + 400);
+
+    heartTimeoutsRef.current.push(timeoutId);
+  }, []);
+
+  const spawnAmbientHeart = useCallback(() => {
+    queueHeart({
+      id: heartIdRef.current++,
+      left: 78 + Math.random() * 18,
+      top: 34 + Math.random() * 20,
+      size: 14 + Math.random() * 10,
+      duration: 2200 + Math.random() * 900,
+      delay: Math.random() * 180,
+      driftX: -16 + Math.random() * 18,
+      driftY: -48 - Math.random() * 22,
+      scaleTo: 1.08 + Math.random() * 0.18,
+    });
+  }, [queueHeart]);
+
+  const handleAssistantBadgerClick = useCallback(() => {
+    const heartCount = 3;
+
+    for (let index = 0; index < heartCount; index += 1) {
+      const angle = (Math.PI * 2 * index) / heartCount + (Math.random() - 0.5) * 0.32;
+      const distance = 42 + Math.random() * 20;
+
+      queueHeart({
+        id: heartIdRef.current++,
+        left: 50 + (Math.random() - 0.5) * 10,
+        top: 50 + (Math.random() - 0.5) * 10,
+        size: 18 + Math.random() * 8,
+        duration: 620 + Math.random() * 180,
+        delay: Math.random() * 40,
+        driftX: Math.cos(angle) * distance,
+        driftY: Math.sin(angle) * distance,
+        scaleTo: 0.92 + Math.random() * 0.14,
+      });
+    }
+  }, [queueHeart]);
+
+  const applyLevelState = useCallback(
+    async (refreshedUser: NonNullable<typeof user>, requestedActiveLevel?: number) => {
       const refreshedCompletedStages = refreshedUser.completedStages ?? [];
       const fallbackActiveLevel = getPreferredActiveLevel(
         refreshedUser.currentLevel,
@@ -121,8 +204,9 @@ export default function Layout() {
         const level = refreshedUser.currentLevel ?? 0;
         let streak = 0;
         try {
-          const summary = await authService.getStreakSummary();
+          const summary = await authService.getStreakSummary({ force: true });
           streak = summary.currentStreak;
+          setDailyStreak(streak);
         } catch {
           streak = 0;
         }
@@ -130,7 +214,7 @@ export default function Layout() {
           BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
         );
         isInitializedRef.current = true;
-    }
+      }
 
 
       return {
@@ -142,71 +226,43 @@ export default function Layout() {
     [setUser]
   );
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const refreshLevelState = useCallback(
+    async (requestedActiveLevel?: number) => {
+      const { user: refreshedUser } = await authService.me();
+      return applyLevelState(refreshedUser, requestedActiveLevel);
+    },
+    [applyLevelState]
+  );
+
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
+    if (!container) return;
     const target = event.target as HTMLElement;
-
-    if (target.closest('button')) {
-      return;
-    }
-
-    dragState.current = {
-      isDragging: true,
-      startX: event.clientX,
-      scrollLeft: container.scrollLeft,
-    };
-
+    if (target.closest('button')) return;
+    dragState.current = { isDragging: true, startX: event.clientX, scrollLeft: container.scrollLeft };
     container.setPointerCapture(event.pointerId);
-  };
+  }, []);
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
+    if (!container || !dragState.current.isDragging) return;
+    container.scrollLeft = dragState.current.scrollLeft - (event.clientX - dragState.current.startX);
+  }, []);
 
-    if (!container || !dragState.current.isDragging) {
-      return;
-    }
-
-    const deltaX = event.clientX - dragState.current.startX;
-    container.scrollLeft = dragState.current.scrollLeft - deltaX;
-  };
-
-  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+  const handleWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    if (container.scrollWidth <= container.clientWidth) {
-      return;
-    }
-
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY;
-
-    if (delta === 0) {
-      return;
-    }
-
+    if (!container || container.scrollWidth <= container.clientWidth) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (delta === 0) return;
     event.preventDefault();
     container.scrollLeft += delta;
-  };
+  }, []);
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
     dragState.current.isDragging = false;
-
-    if (container?.hasPointerCapture(event.pointerId)) {
-      container.releasePointerCapture(event.pointerId);
-    }
-  };
+    if (container?.hasPointerCapture(event.pointerId)) container.releasePointerCapture(event.pointerId);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -225,7 +281,8 @@ export default function Layout() {
 
     let isMounted = true;
 
-    refreshLevelState()
+    const storedLevel = parseInt(sessionStorage.getItem('activeLevel') ?? '', 10) || undefined;
+    refreshLevelState(storedLevel)
       .catch(() => {
         if (!isMounted) {
           return;
@@ -248,8 +305,27 @@ export default function Layout() {
       if (badgerTransitionTimeoutRef.current !== null) {
         window.clearTimeout(badgerTransitionTimeoutRef.current);
       }
+      heartTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     };
   }, []);
+
+  useEffect(() => {
+    if (!assistantOpen) {
+      setHearts([]);
+      heartTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      heartTimeoutsRef.current = [];
+      return;
+    }
+
+    const intervalId = window.setInterval(spawnAmbientHeart, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      heartTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      heartTimeoutsRef.current = [];
+      setHearts([]);
+    };
+  }, [assistantOpen, spawnAmbientHeart]);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -259,14 +335,14 @@ export default function Layout() {
     let isMounted = true;
 
     authService
-      .getStreakSummary()
+      .getStreakSummary({ force: true })
       .then((summary) => {
         if (isMounted) {
           setDailyStreak(summary.currentStreak);
         }
       })
       .catch(() => {
-        if (isMounted) {
+        if (isMounted && authService.peekStreakSummary() === null) {
           setDailyStreak(0);
         }
       });
@@ -277,24 +353,25 @@ export default function Layout() {
   }, []);
 
   const level = user?.currentLevel ?? 0;
+  const resolvedDailyStreak = dailyStreak ?? 0;
 
   useEffect(() => {
     if (!isInitializedRef.current) return;
     
     const newlyUnlocked = BADGES.filter((badge) => {
-      const isUnlocked = badge.condition(dailyStreak, level);
+      const isUnlocked = badge.condition(resolvedDailyStreak, level);
       const wasUnlocked = prevUnlockedRef.current.has(badge.label);
       return isUnlocked && !wasUnlocked;
     });
 
     prevUnlockedRef.current = new Set(
-      BADGES.filter((b) => b.condition(dailyStreak, level)).map((b) => b.label)
+      BADGES.filter((b) => b.condition(resolvedDailyStreak, level)).map((b) => b.label)
     );
 
     if (newlyUnlocked.length > 0) {
       setAchievementQueue((prev) => [...prev, ...newlyUnlocked]);
     }
-  }, [dailyStreak, level]);
+  }, [level, resolvedDailyStreak]);
 
   const updateLevel = async (action: 'reset' | 'progress') => {
     if (levelLoading) {
@@ -305,12 +382,15 @@ export default function Layout() {
 
     try {
       const previousLevel = furthestUnlockedLevel;
-      if (action === 'reset') {
-        await authService.resetLevel();
-      } else {
-        await authService.progressLevel();
-      }
-      const refreshedState = await refreshLevelState();
+      const refreshedState = action === 'reset'
+        ? await (async () => {
+        const { user: refreshedUser } = await authService.resetLevel();
+            return applyLevelState(refreshedUser);
+          })()
+        : await (async () => {
+            const { user: refreshedUser } = await authService.progressLevel();
+            return applyLevelState(refreshedUser);
+          })();
 
       if (action === 'progress' && refreshedState.unlockedLevel > previousLevel) {
         setShowLevelUp(true);
@@ -327,18 +407,10 @@ export default function Layout() {
     }
   };
 
-  const handleLevelSelect = async (level: number) => {
-    if (levelLoading) {
-      return;
-    }
-
-    try {
-      await refreshLevelState(level);
-    } catch {
-      logout();
-      navigate('/');
-    }
-  };
+  const handleLevelSelect = useCallback((level: number) => {
+    if (levelLoading) return;
+    if (isLevelUnlocked(level, completedStages)) setActiveLevel(level);
+  }, [levelLoading, completedStages]);
 
   const handleLevelSixFile = (file: File | null) => {
     if (!file) {
@@ -458,7 +530,9 @@ export default function Layout() {
           aria-label="Open streak page"
         >
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
-          <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
+          <span className="text-xl font-semibold text-orange-400">
+            {dailyStreak === null ? '...' : `${dailyStreak} days`}
+          </span>
         </button>
         <div className="ml-8 flex items-center gap-3 lg:ml-12">
           <button
@@ -481,6 +555,13 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => !checkinDone && setCheckinOpen(true)}
+            disabled={checkinDone}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
+          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
@@ -531,16 +612,16 @@ export default function Layout() {
               onPointerLeave={handlePointerUp}
               onWheel={handleWheel}
             >
-              <div className="relative h-12 w-full min-w-[36rem] px-1 sm:min-w-[42rem]">
-                <div className="absolute left-6 right-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-200" />
+              <div className="relative h-14 w-full min-w-[36rem] px-1 sm:min-w-[42rem]">
+                <div className="absolute left-6 right-6 top-1/2 h-[3px] -translate-y-1/2 rounded-sm border border-[rgba(196,177,160,0.55)] bg-neutral-200" />
                 <div
-                  className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
+                  className="absolute left-6 top-1/2 h-[3px] -translate-y-1/2 rounded-sm border border-[rgba(196,177,160,0.88)] bg-[rgba(206,183,161,1)] transition-all"
                   style={{
                     width: `calc((100% - 3rem) * ${Math.max(0, (furthestUnlockedLevel - 1) / (levels.length - 1))})`,
                   }}
                 />
 
-                <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
+                <div className="relative flex h-14 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
                     const isUnlocked = isLevelUnlocked(level, completedStages);
@@ -552,16 +633,14 @@ export default function Layout() {
                         type="button"
                         onClick={() => isUnlocked && void handleLevelSelect(level)}
                         disabled={!isUnlocked}
-                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
-                          isCompleted
-                            ? isActive
-                              ? 'border-green-600 bg-green-600 text-white'
-                              : 'border-green-500 bg-green-50 text-green-600 hover:bg-green-100'
+                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.4rem] border-2 text-base font-bold shadow-[0_1px_0_rgba(81,60,45,0.08)] transition ${
+                          isActive
+                            ? 'border-[rgba(81,60,45,1)] bg-[rgba(81,60,45,1)] text-[rgba(252,248,243,1)]'
+                            : isCompleted
+                              ? 'border-[rgba(150,201,89,1)] bg-[rgba(224,252,190,1)] text-[rgba(58,110,31,1)] hover:border-[rgba(132,186,73,1)] hover:bg-[rgba(232,255,205,1)]'
                             : isUnlocked
-                              ? isActive
-                                ? 'border-neutral-800 bg-neutral-800 text-white'
-                                : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
-                              : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
+                              ? 'border-[rgba(196,177,160,1)] bg-[rgba(231,214,194,1)] text-[rgba(95,72,54,1)] hover:border-[rgba(175,152,130,1)] hover:bg-[rgba(238,223,205,1)]'
+                            : 'cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-400'
                         }`}
                         aria-pressed={isActive}
                         aria-label={isUnlocked ? `Show level ${level}` : `Level ${level} is locked`}
@@ -573,7 +652,7 @@ export default function Layout() {
                         ) : isUnlocked ? (
                           level
                         ) : (
-                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current">
                             <path d="M16 10V8a4 4 0 1 0-8 0v2H7v10h10V10h-1Zm-6-2a2 2 0 1 1 4 0v2h-4V8Zm5 10H9v-6h6v6Z" />
                           </svg>
                         )}
@@ -587,10 +666,10 @@ export default function Layout() {
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div className="flex min-h-full flex-1 overflow-y-auto rounded-md bg-neutral-200/70 p-3">
-              {activeLevel === 1 && <Level1 />}
+              {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
-              {activeLevel === 3 && <LiteratureReview />}
-              {activeLevel === 6 && (
+              {activeLevel === 3 && <ResearchProposal />}
+              {activeLevel === 5 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (
                     <DocumentReview
@@ -660,14 +739,38 @@ export default function Layout() {
           }}
         >
           <div className="relative flex justify-center">
-            <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleAssistantBadgerClick}
+              className="relative flex justify-center overflow-visible border-0 bg-transparent p-0 focus:outline-none"
+              aria-label="Celebrate with the AI assistant"
+            >
               <img
                 ref={assistantBadgerRef}
                 src={badgerImage}
                 alt="Badger"
                 className="h-24 w-24 rounded-full object-cover"
               />
-            </div>
+              <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true">
+                {hearts.map((heart) => (
+                  <span
+                    key={heart.id}
+                    className="absolute select-none text-[rgba(198,24,24,0.46)] drop-shadow-[0_2px_5px_rgba(160,16,16,0.18)]"
+                    style={{
+                      left: `${heart.left}%`,
+                      top: `${heart.top}%`,
+                      fontSize: `${heart.size}px`,
+                      ['--assistant-heart-drift-x' as string]: `${heart.driftX}px`,
+                      ['--assistant-heart-drift-y' as string]: `${heart.driftY}px`,
+                      ['--assistant-heart-scale-to' as string]: `${heart.scaleTo}`,
+                      animation: `assistant-heart-float ${heart.duration}ms ease-out ${heart.delay}ms forwards`,
+                    }}
+                  >
+                    {String.fromCharCode(0x2665)}
+                  </span>
+                ))}
+              </div>
+            </button>
             <button
               onClick={closeAssistant}
               className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
@@ -716,6 +819,41 @@ export default function Layout() {
           />
         ))}
       </div>
+
+      {/* Daily check-in modal */}
+      {checkinOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }}
+          onClick={() => setCheckinOpen(false)}
+        >
+          <div
+            className="relative w-full mx-4 overflow-y-auto"
+            style={{
+              maxWidth: 600, maxHeight: '90vh',
+              backgroundColor: 'rgba(252,248,243,1)',
+              border: '1px solid rgba(196,177,160,1)',
+              borderRadius: 14,
+              padding: '2rem',
+              boxShadow: '0 8px 40px rgba(81,60,45,0.18)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(140,115,95,1)' }}>
+                Daily check-in
+              </p>
+              <button
+                onClick={() => setCheckinOpen(false)}
+                style={{ fontSize: 16, color: 'rgba(140,115,95,1)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+            <DailyCheckin onComplete={() => setCheckinDone(true)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -144,11 +144,12 @@ Rules:
 
       // Fetch all topics for the user's university
       const topicsResult = await db.query(
-        `SELECT t.id, t.title, t.description, array_agg(f.name) FILTER (WHERE f.name IS NOT NULL) AS field_names
+        `SELECT t.id, t.title, t.description, t."fieldIds", u.name as "universityName", array_agg(f.name) FILTER (WHERE f.name IS NOT NULL) AS field_names
          FROM topics t
          LEFT JOIN fields f ON f.id = ANY(t."fieldIds"::text[])
+         LEFT JOIN universities u ON u.id = t."universityId"
          WHERE t."universityId" = (SELECT university_id FROM "User" WHERE id = $1)
-         GROUP BY t.id`,
+         GROUP BY t.id, u.name`,
         [userId]
       );
       const topics = topicsResult.rows;
@@ -203,10 +204,16 @@ Rules:
         (parsed.suggestions ?? []).map((s: any) => [s.id, s.reason])
       );
 
+      const parseArr = (v: unknown): string[] => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string') return v.replace(/^\{|\}$/g, '').split(',').filter(Boolean).map(s => s.replace(/^"|"$/g, ''));
+        return [];
+      };
+
       const matched = topics
         .filter((t) => suggestionIds.includes(t.id))
         .sort((a, b) => suggestionIds.indexOf(a.id) - suggestionIds.indexOf(b.id))
-        .map((t) => ({ ...t, reason: reasonMap[t.id] ?? '' }));
+        .map((t) => ({ ...t, fieldIds: parseArr(t.fieldIds), reason: reasonMap[t.id] ?? '' }));
 
       res.json({ suggestions: matched });
       return;

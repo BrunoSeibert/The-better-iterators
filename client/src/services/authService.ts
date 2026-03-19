@@ -1,5 +1,7 @@
 import { api } from './api';
 
+const STREAK_CACHE_KEY = 'studyon.streak-summary';
+
 type AuthUser = {
   id: string;
   name: string;
@@ -25,6 +27,15 @@ type RawAuthUser = {
   firstLoginDate?: string;
 };
 
+export type StreakSummary = {
+  firstLoginDate: string;
+  currentStreak: number;
+  activeDates: string[];
+  streakDates: string[];
+  month: number;
+  year: number;
+};
+
 const normalizeUser = (user: RawAuthUser): AuthUser => ({
   id: user.id,
   name: user.name,
@@ -35,6 +46,45 @@ const normalizeUser = (user: RawAuthUser): AuthUser => ({
   first_login_date: user.first_login_date,
   firstLoginDate: user.firstLoginDate ?? user.first_login_date,
 });
+
+const readCachedStreakSummary = (): StreakSummary | null => {
+  try {
+    const rawValue = localStorage.getItem(STREAK_CACHE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    return JSON.parse(rawValue) as StreakSummary;
+  } catch {
+    return null;
+  }
+};
+
+let streakSummaryCache: StreakSummary | null = readCachedStreakSummary();
+let streakSummaryPromise: Promise<StreakSummary> | null = null;
+
+const persistCachedStreakSummary = (summary: StreakSummary | null) => {
+  streakSummaryCache = summary;
+
+  try {
+    if (summary) {
+      localStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(summary));
+    } else {
+      localStorage.removeItem(STREAK_CACHE_KEY);
+    }
+  } catch {
+    // Ignore localStorage write failures and keep the in-memory cache.
+  }
+};
+
+export function peekStreakSummary() {
+  return streakSummaryCache;
+}
+
+export function clearStreakSummaryCache() {
+  streakSummaryPromise = null;
+  persistCachedStreakSummary(null);
+}
 
 export async function register(name: string, email: string, password: string) {
   const res = await api.post('/auth/register', { name, email, password });
@@ -61,68 +111,36 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+type TopicListItem = {
+  id: string;
+  title: string;
+  description: string;
+  employment: string;
+  employmentType: string | null;
+  workplaceType: string | null;
+  degrees: string[];
+  companyId: string;
+  universityName: string | null;
+};
+
 export async function getTopicsAllUniversities() {
   const res = await api.get('/topics/by-university?alluniversities=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicsFromOtherUniversities() {
   const res = await api.get('/topics/by-university?other=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getAllTopics() {
   const res = await api.get('/topics/by-university?all=true&global=true');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicsByUniversity(all = false) {
   const res = await api.get(all ? '/topics/by-university?all=true' : '/topics/by-university');
-  return res.data as {
-    topics: {
-      id: string;
-      title: string;
-      description: string;
-      employment: string;
-      employmentType: string | null;
-      workplaceType: string | null;
-      degrees: string[];
-      companyId: string;
-    }[];
-  };
+  return res.data as { topics: TopicListItem[] };
 }
 
 export async function getTopicById(id: string) {
@@ -151,16 +169,26 @@ export async function getTopicById(id: string) {
   };
 }
 
-export async function getStreakSummary() {
-  const res = await api.get('/auth/streak');
-  return res.data as {
-    firstLoginDate: string;
-    currentStreak: number;
-    activeDates: string[];
-    streakDates: string[];
-    month: number;
-    year: number;
-  };
+export async function getStreakSummary(options?: { force?: boolean }) {
+  if (!options?.force && streakSummaryCache) {
+    return streakSummaryCache;
+  }
+
+  if (streakSummaryPromise) {
+    return streakSummaryPromise;
+  }
+
+  streakSummaryPromise = api.get('/auth/streak')
+    .then((res) => {
+      const summary = res.data as StreakSummary;
+      persistCachedStreakSummary(summary);
+      return summary;
+    })
+    .finally(() => {
+      streakSummaryPromise = null;
+    });
+
+  return streakSummaryPromise;
 }
 
 export type StarterPaper = {
@@ -195,8 +223,14 @@ export type TopicSuggestion = {
   title: string;
   description: string;
   field_names: string[];
+  universityName: string | null;
   reason: string;
 };
+
+export async function getTopicsSimilarFromOthers(topicIds: string[]) {
+  const res = await api.get(`/topics/by-university?other=true&fromTopicIds=${topicIds.join(',')}`);
+  return res.data as { topics: TopicListItem[] };
+}
 
 export async function literatureSuggestTopics(
   papers: PaperAnalysis[],
@@ -213,6 +247,35 @@ export async function literatureAnalyze(
 ): Promise<PaperAnalysis> {
   const res = await api.post('/literature', { phase: 2, input, papers, feedback });
   return { ...res.data, input };
+}
+
+export type ProposalMessage = { role: 'user' | 'assistant'; content: string };
+
+export async function proposalTopicFeedback(
+  topicTitle: string,
+  topicDescription: string,
+  messages: ProposalMessage[]
+): Promise<{ critique: string; suggestion: string; feasibility: 'high' | 'medium' | 'low' }> {
+  const res = await api.post('/proposal', { phase: 'topic-feedback', topicTitle, topicDescription, messages });
+  return res.data;
+}
+
+export async function proposalSectionFeedback(
+  section: 'question' | 'motivation' | 'approach' | 'outcome',
+  content: string,
+  allSections: Record<string, string>,
+  messages: ProposalMessage[]
+): Promise<{ critique: string; suggestion: string }> {
+  const res = await api.post('/proposal', { phase: 'section-feedback', section, content, allSections, messages });
+  return res.data;
+}
+
+export async function proposalGenerateFinal(
+  topic: { title: string; description?: string },
+  sections: { question: string; motivation: string; approach: string; outcome: string }
+): Promise<{ title: string; body: string }> {
+  const res = await api.post('/proposal', { phase: 'generate-final', topic, sections });
+  return res.data;
 }
 
 export async function completeOnboarding(data: {

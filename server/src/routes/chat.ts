@@ -60,7 +60,7 @@ ${JSON.stringify(projects.rows, null, 2)}
 }
 
 router.post('/', requireAuth, async (req: Request, res: Response) => {
-  const { messages, conversationId } = req.body;
+  const { messages, conversationId, checkinContext } = req.body;
   const userId = (req as AuthRequest).userId;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -114,6 +114,10 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 ${JSON.stringify(currentUser, null, 2)}
 `;
 
+    const checkinSection = checkinContext
+      ? `\n\n## Today's Check-in\n${checkinContext}`
+      : '';
+
     const systemPrompt = `You are StudyOnd's AI thesis assistant. Help students find thesis topics, supervisors, companies and experts that match their interests and goals.
 
 When making recommendations, always refer to specific names, titles and descriptions from the platform data below. Be specific and helpful.
@@ -125,7 +129,7 @@ When writing mathematical expressions, you MUST use these exact formats:
 
 ${userContext}
 ${dbContext}
-${previousContext}`;
+${previousContext}${checkinSection}`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

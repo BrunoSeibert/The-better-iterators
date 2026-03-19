@@ -25,6 +25,9 @@ import { reviewRouter } from './routes/review';
 import topicsRoutes from './routes/topics';
 import literatureRoutes from './routes/literature';
 import mapRoutes from './routes/map';
+import checkinRoutes from './routes/checkin';
+import proposalRoutes from './routes/proposal';
+
 app.use('/api/map', mapRoutes);
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
@@ -32,6 +35,8 @@ app.use('/api/data', dataRoutes);
 app.use('/api/review', reviewRouter);
 app.use('/api/topics', topicsRoutes);
 app.use('/api/literature', literatureRoutes);
+app.use('/api/checkin', checkinRoutes);
+app.use('/api/proposal', proposalRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
