@@ -5,6 +5,7 @@ import StreakPage from '@/pages/StreakPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 import { useAuthStore } from '@/store/authStore';
 import Profile from './pages/Profile';
+import TopicDetailPage from '@/pages/TopicDetailPage';
 
 function ProtectedRoute() {
   const { token, user } = useAuthStore((state) => state);
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/app" element={<Layout />} />
         <Route path="/streak" element={<StreakPage />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/topics/:id" element={<TopicDetailPage />} />
       </Route>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
-import Level2 from '@/pages/Level2';
+import Level1 from '@/pages/Level1';
 import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
@@ -584,8 +584,8 @@ export default function Layout() {
           </div>
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
-            <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
-              {activeLevel === 1 && <Level2 />}
+            <div className="flex min-h-full flex-1 overflow-y-auto rounded-md bg-neutral-200/70 p-3">
+              {activeLevel === 1 && <Level1 />}
               {activeLevel === 6 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (
