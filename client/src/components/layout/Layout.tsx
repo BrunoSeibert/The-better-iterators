@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   type ChangeEvent,
   type DragEvent,
   useEffect,
@@ -35,6 +36,13 @@ const getPdfPreviewWidth = (
   return Math.max(220, Math.min(760, Math.floor(availableWidth - 96)));
 };
 
+type RectState = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
@@ -57,10 +65,18 @@ export default function Layout() {
   );
   const [levelSixPreviewText, setLevelSixPreviewText] = useState('');
   const [levelSixPreviewUrl, setLevelSixPreviewUrl] = useState<string | null>(null);
+  const [badgerTransition, setBadgerTransition] = useState<{
+    from: RectState;
+    to: RectState;
+    phase: 'start' | 'end';
+  } | null>(null);
   const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
   const levelSixPdfContainerRef = useRef<HTMLDivElement | null>(null);
+  const badgerButtonSlotRef = useRef<HTMLDivElement | null>(null);
+  const assistantBadgerRef = useRef<HTMLImageElement | null>(null);
+  const badgerTransitionTimeoutRef = useRef<number | null>(null);
   const levelUpTimeoutRef = useRef<number | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -181,6 +197,9 @@ export default function Layout() {
     return () => {
       if (levelUpTimeoutRef.current !== null) {
         window.clearTimeout(levelUpTimeoutRef.current);
+      }
+      if (badgerTransitionTimeoutRef.current !== null) {
+        window.clearTimeout(badgerTransitionTimeoutRef.current);
       }
     };
   }, []);
@@ -384,6 +403,72 @@ export default function Layout() {
     }
   };
 
+  const openAssistant = () => {
+    setAssistantOpen(true);
+  };
+
+  const closeAssistant = () => {
+    const source = assistantBadgerRef.current?.getBoundingClientRect();
+    const target = badgerButtonSlotRef.current?.getBoundingClientRect();
+
+    if (!source || !target) {
+      setAssistantOpen(false);
+      return;
+    }
+
+    const from = {
+      top: source.top,
+      left: source.left,
+      width: source.width,
+      height: source.height,
+    };
+    const to = {
+      top: target.top,
+      left: target.left,
+      width: target.width,
+      height: target.height,
+    };
+
+    if (badgerTransitionTimeoutRef.current !== null) {
+      window.clearTimeout(badgerTransitionTimeoutRef.current);
+    }
+
+    setBadgerTransition({ from, to, phase: 'start' });
+    setAssistantOpen(false);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setBadgerTransition((current) =>
+          current ? { ...current, phase: 'end' } : null
+        );
+      });
+    });
+
+    badgerTransitionTimeoutRef.current = window.setTimeout(() => {
+      setBadgerTransition(null);
+      badgerTransitionTimeoutRef.current = null;
+    }, 320);
+  };
+
+  const badgerTransitionStyle: CSSProperties | undefined = badgerTransition
+    ? {
+        top: badgerTransition.phase === 'start'
+          ? badgerTransition.from.top
+          : badgerTransition.to.top,
+        left: badgerTransition.phase === 'start'
+          ? badgerTransition.from.left
+          : badgerTransition.to.left,
+        width: badgerTransition.phase === 'start'
+          ? badgerTransition.from.width
+          : badgerTransition.to.width,
+        height: badgerTransition.phase === 'start'
+          ? badgerTransition.from.height
+          : badgerTransition.to.height,
+      }
+    : undefined;
+  const showTopbarBadgerImage = !assistantOpen && !badgerTransition;
+  const showTopbarBadgerButton = !assistantOpen || Boolean(badgerTransition);
+
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
       {showLevelUp && (
@@ -408,7 +493,7 @@ export default function Layout() {
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
           <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
         </button>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-8 flex items-center gap-3 lg:ml-12">
           <button
             type="button"
             onClick={() => updateLevel('reset')}
@@ -423,10 +508,31 @@ export default function Layout() {
               onClick={() => updateLevel('progress')}
               disabled={levelLoading}
               className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Progress Level
-            </button>
-          )}
+              >
+                Progress Level
+              </button>
+            )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
+            {showTopbarBadgerButton && (
+              <button
+                type="button"
+                onClick={openAssistant}
+                className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+                aria-label="Show AI Assistant"
+              >
+                <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
+                {showTopbarBadgerImage && (
+                  <img
+                    src={badgerImage}
+                    alt="Badger"
+                    className="h-full w-full rounded-[15%] object-cover"
+                  />
+                )}
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => { logout(); navigate('/login'); }}
@@ -651,20 +757,6 @@ export default function Layout() {
 
       </main>
 
-      {!assistantOpen && (
-        <button
-          onClick={() => setAssistantOpen(true)}
-          className="fixed right-4 top-[calc(max(10vh,72px)+50%)] z-20 -translate-y-1/2 overflow-hidden rounded-full shadow-lg transition hover:shadow-xl"
-          aria-label="Open AI Assistant"
-        >
-          <img
-            src={badgerImage}
-            alt="Badger"
-            className="h-20 w-20 object-cover"
-          />
-        </button>
-      )}
-
       {assistantOpen && (
         <aside
           className="fixed right-0 z-20 border-l border-neutral-200 bg-white px-3 py-8 pl-4 text-neutral-900"
@@ -677,13 +769,14 @@ export default function Layout() {
           <div className="relative flex justify-center">
             <div className="flex justify-center">
               <img
+                ref={assistantBadgerRef}
                 src={badgerImage}
                 alt="Badger"
                 className="h-24 w-24 rounded-full object-cover"
               />
             </div>
             <button
-              onClick={() => setAssistantOpen(false)}
+              onClick={closeAssistant}
               className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
               aria-label="Close AI Assistant"
             >
@@ -702,6 +795,20 @@ export default function Layout() {
             <AiAssistant />
           </div>
         </aside>
+      )}
+
+      {badgerTransition && (
+        <div
+          className="pointer-events-none fixed z-40 overflow-hidden rounded-[15%] transition-[top,left,width,height] duration-300 ease-out"
+          style={badgerTransitionStyle}
+          aria-hidden="true"
+        >
+          <img
+            src={badgerImage}
+            alt=""
+            className="h-full w-full rounded-[15%] object-cover shadow-[0_18px_40px_-20px_rgba(23,23,23,0.85)]"
+          />
+        </div>
       )}
     </div>
   );
