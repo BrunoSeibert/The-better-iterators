@@ -18,7 +18,8 @@ import ResearchProposal from '@/pages/ResearchProposal';
 import ResearchWorkspace from '@/pages/ResearchWorkspace';
 import DailyCheckin from '@/components/DailyCheckin';
 import { DocumentReview } from '../document-review';
-import studyonLogo from '@/assets/Studyon_Logo.png';
+import ThesisPresentationTestMode from '../presentation-test/ThesisPresentationTestMode';
+import studyonLogo from '@/assets/Study_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
@@ -447,6 +448,15 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
+  const handleCheckinButtonClick = () => {
+    if (checkinDone) {
+      localStorage.removeItem('todayCheckin');
+      setCheckinDone(false);
+    }
+
+    setCheckinOpen(true);
+  };
+
   const closeAssistant = () => {
     const source = assistantBadgerRef.current?.getBoundingClientRect();
     const target = badgerButtonSlotRef.current?.getBoundingClientRect();
@@ -522,7 +532,7 @@ export default function Layout() {
         <img
           src={studyonLogo}
           alt="Studyon logo"
-          className="h-14 w-14 object-contain brightness-0 invert"
+          className="h-12 w-12 object-contain brightness-0 invert"
         />
         <button
           type="button"
@@ -557,9 +567,8 @@ export default function Layout() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => !checkinDone && setCheckinOpen(true)}
-            disabled={checkinDone}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+            onClick={handleCheckinButtonClick}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
           >
             {checkinDone ? '✓ Checked in' : 'Daily check-in'}
           </button>
@@ -666,7 +675,11 @@ export default function Layout() {
           </div>
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
-            <div className="flex min-h-full flex-1 overflow-y-auto rounded-md bg-neutral-200/70 p-3">
+            <div
+              className={`flex min-h-full flex-1 overflow-y-auto rounded-md p-3 ${
+                levelSixCorrecting ? 'bg-transparent' : 'bg-neutral-200/70'
+              }`}
+            >
               {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
               {activeLevel === 3 && <ResearchProposal />}
@@ -724,6 +737,7 @@ export default function Layout() {
                   </div>
                 )
               )}
+              {activeLevel === 6 && <ThesisPresentationTestMode />}
             </div>
             <Outlet />
           </div>

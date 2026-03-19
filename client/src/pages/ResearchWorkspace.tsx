@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import {
   getResearchLibrary,
   addResearchPaper,
   deleteResearchPaper,
   uploadResearchPdf,
-  deleteResearchPdf,
-  getResearchPdfUrl,
   researchFindPapers,
   researchCheckSource,
   researchFormatCitation,
@@ -75,7 +73,7 @@ function Spinner() {
   );
 }
 
-function SectionLabel({ children }: { children: string }) {
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">{children}</p>
   );
@@ -269,15 +267,22 @@ function AddPaperModal({
           <div>
             <label className="mb-1 block text-xs font-semibold text-neutral-500">PDF (optional)</label>
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)} />
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => fileRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  fileRef.current?.click();
+                }
+              }}
               className="flex items-center gap-2 rounded-xl border border-dashed border-neutral-300 px-4 py-2.5 text-sm text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50"
             >
               <span>📄</span>
               {pdfFile ? <span className="font-medium text-neutral-800">{pdfFile.name}</span> : 'Attach PDF…'}
               {pdfFile && <button type="button" onClick={(e) => { e.stopPropagation(); setPdfFile(null); }} className="ml-auto text-neutral-400 hover:text-red-400">✕</button>}
-            </button>
+            </div>
           </div>
         </div>
 

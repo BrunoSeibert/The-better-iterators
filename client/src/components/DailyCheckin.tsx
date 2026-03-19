@@ -2,7 +2,8 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuthStore } from '@/store/authStore';
-import badgerImage from '@/assets/badger_taskbar.png';
+import mascotBackImage from '@/assets/dailycheckin-mascot-back.png';
+import mascotFrontImage from '@/assets/dailycheckin-mascot-front.png';
 
 const LEVEL_NAMES: Record<number, string> = {
   1: 'Explore topics & literature review',
@@ -43,6 +44,16 @@ const C = {
   warmWhite:  'rgba(245,239,231,1)',
   border:     'rgba(196,177,160,1)',
   mutedText:  'rgba(140,115,95,1)',
+};
+
+const layeredMascotStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: -103,
+  left: 0,
+  width: 162,
+  height: 162,
+  objectFit: 'contain',
+  pointerEvents: 'none',
 };
 
 export default function DailyCheckin({ onComplete }: Props) {
@@ -195,9 +206,18 @@ export default function DailyCheckin({ onComplete }: Props) {
           </div>
         ) : aiResponse ? (
           <div className="relative mt-16">
+            <img
+              src={mascotBackImage}
+              alt=""
+              aria-hidden="true"
+              style={{
+                ...layeredMascotStyle,
+                zIndex: 0,
+              }}
+            />
             <div
               className="rounded-[0.5rem] px-4 pt-5 pb-4"
-              style={{ background: C.warmWhite, border: `1px solid ${C.border}` }}
+              style={{ background: C.warmWhite, border: `1px solid ${C.border}`, position: 'relative', zIndex: 1 }}
             >
               <p style={{ fontSize: 11, fontWeight: 700, color: C.mutedText, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
                 Noodle
@@ -210,17 +230,12 @@ export default function DailyCheckin({ onComplete }: Props) {
               </div>
             </div>
             <img
-              src={badgerImage}
+              src={mascotFrontImage}
               alt="Noodle"
               style={{
-                position: 'absolute',
-                top: -83,
-                left: 12,
-                width: 130,
-                height: 130,
-                objectFit: 'contain',
-                mixBlendMode: 'multiply',
-                pointerEvents: 'none',
+                ...layeredMascotStyle,
+                top: -105,
+                zIndex: 2,
               }}
             />
           </div>
@@ -256,7 +271,7 @@ export default function DailyCheckin({ onComplete }: Props) {
         <Label>Energy level</Label>
         <div className="flex gap-3 items-end">
           {[1, 2, 3, 4, 5].map((val) => {
-            const active = energy === val;
+            const active = energy !== null && val <= energy;
             const size   = 18 + val * 5;
             return (
               <button

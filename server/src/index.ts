@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // Routes
@@ -28,6 +28,9 @@ import mapRoutes from './routes/map';
 import checkinRoutes from './routes/checkin';
 import proposalRoutes from './routes/proposal';
 import researchRoutes from './routes/research';
+import { speechRouter } from './routes/speech';
+import presentationTestRoutes from './routes/presentationTest';
+
 app.use('/api/map', mapRoutes);
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
@@ -38,6 +41,8 @@ app.use('/api/literature', literatureRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/proposal', proposalRoutes);
 app.use('/api/research', researchRoutes);
+app.use('/api/speech', speechRouter);
+app.use('/api/presentation-test', presentationTestRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
