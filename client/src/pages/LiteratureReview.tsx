@@ -239,7 +239,7 @@ export default function LiteratureReview() {
         <button
           onClick={handleAnalyze}
           disabled={!input.trim() || analyzing}
-          className="self-start rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
+          className="self-start rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
           style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
         >
           {analyzing ? 'Analyzing…' : 'Analyze paper'}
@@ -261,7 +261,7 @@ export default function LiteratureReview() {
                 <button
                   onClick={handleSuggestTopics}
                   disabled={papers.length < 2 || loadingSuggestions}
-                  className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 >
                   {loadingSuggestions ? 'Finding topics…' : 'Find me a topic'}
@@ -307,7 +307,7 @@ export default function LiteratureReview() {
                     onClick={() => {
                       navigate('/explore-other-topics', { state: { topicIds: suggestions.map((t) => t.id) } });
                     }}
-                    className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
+                    className="rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
                     style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                   >
                     Explore similar topics from other universities

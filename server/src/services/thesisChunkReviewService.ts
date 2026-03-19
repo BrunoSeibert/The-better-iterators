@@ -15,8 +15,24 @@ const REVIEW_TIMEOUT_MS = 45000;
 export async function reviewThesisChunks(
   request: ThesisChunkReviewRequest
 ): Promise<ParsedThesisChunkReviewResponse> {
+  // Internal audit note:
+  // - OpenAI API entry point for Mainframe 5 is this service
+  // - it receives { documentType, estimatedPageCount, chunks }
+  // - it sends json_schema output and parses back into chunk-index-only annotations
+  console.info('[review] reviewThesisChunks entry', {
+    model: REVIEW_MODEL,
+    chunkCount: request.chunks.length,
+    estimatedPageCount: request.estimatedPageCount,
+    payloadShape: {
+      documentType: typeof request.documentType,
+      estimatedPageCount: typeof request.estimatedPageCount,
+      chunks: 'Array<{ chunkIndex: number; text: string }>',
+    },
+  });
+
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not configured.');
+    console.warn('[review] OPENAI_API_KEY missing, returning empty annotations');
+    return { annotations: [] };
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -38,13 +54,17 @@ export async function reviewThesisChunks(
       REVIEW_TIMEOUT_MS,
       'OpenAI review timed out.'
     );
-  } catch {
-    throw new Error('openai request failed');
+  } catch (error) {
+    console.warn('[review] openai request failed', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    });
+    return { annotations: [] };
   }
 
   const rawContent = completion.choices[0]?.message?.content;
   if (!rawContent) {
-    throw new Error('schema parse failed');
+    console.warn('[review] missing message content from OpenAI, returning empty annotations');
+    return { annotations: [] };
   }
 
   let parsed: unknown;
@@ -52,10 +72,23 @@ export async function reviewThesisChunks(
   try {
     parsed = JSON.parse(rawContent);
   } catch {
-    throw new Error('schema parse failed');
+    console.warn('[review] invalid JSON returned from OpenAI, returning empty annotations');
+    return { annotations: [] };
   }
 
-  return parseThesisChunkReviewResponse(parsed);
+  const result = parseThesisChunkReviewResponse(parsed, {
+    maxChunkIndex: request.chunks.length - 1,
+  });
+
+  console.info('[review] parsed thesis review response', {
+    annotationCount: result.annotations.length,
+    types: result.annotations.reduce<Record<string, number>>((accumulator, annotation) => {
+      accumulator[annotation.type] = (accumulator[annotation.type] ?? 0) + 1;
+      return accumulator;
+    }, {}),
+  });
+
+  return result;
 }
 
 async function withTimeout<T>(

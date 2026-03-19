@@ -4,6 +4,18 @@ import type { ParsedReviewSuccess, ReviewAnnotation } from './types';
 
 const reviewWordPattern = /[\p{L}\p{N}][\p{L}\p{N}'Ã¢â‚¬â„¢-]*/gu;
 const cleanupRegistry = new WeakMap<HTMLElement, () => void>();
+const activeAnnotationRegistry = new WeakMap<HTMLElement, string | null>();
+
+type HighlightController = {
+  cleanup: () => void;
+  rerender: (config: {
+    wordAnnotations: Map<number, ReviewAnnotation>;
+    startingWordIndex: number;
+    documentModel?: ParsedReviewSuccess;
+  }) => void;
+};
+
+const controllerRegistry = new WeakMap<HTMLElement, HighlightController>();
 
 type Rect = {
   top: number;
@@ -31,7 +43,15 @@ export const applyHighlightsToContainer = (
   startingWordIndex = 0,
   documentModel?: ParsedReviewSuccess
 ) => {
-  clearReviewAnnotations(root);
+  const existingController = controllerRegistry.get(root);
+  if (existingController) {
+    existingController.rerender({
+      wordAnnotations,
+      startingWordIndex,
+      documentModel,
+    });
+    return existingController.cleanup;
+  }
 
   const rootPosition = window.getComputedStyle(root).position;
   if (rootPosition === 'static') {
@@ -52,18 +72,44 @@ export const applyHighlightsToContainer = (
   document.body.append(tooltipLayer);
 
   const annotationsById = new Map<string, ReviewAnnotation>();
-  wordAnnotations.forEach((annotation) => {
-    annotationsById.set(annotation.id, annotation);
-  });
+  let currentWordAnnotations = wordAnnotations;
+  let currentStartingWordIndex = startingWordIndex;
+  let currentDocumentModel = documentModel;
+  let activeAnnotationId: string | null = activeAnnotationRegistry.get(root) ?? null;
+  const setActiveAnnotationId = (nextAnnotationId: string | null) => {
+    activeAnnotationId = nextAnnotationId;
+    activeAnnotationRegistry.set(root, activeAnnotationId);
+    rerender();
+  };
 
   const rerender = () => {
-    const renderedTokenRects = collectRenderedTokenRects(root, wordAnnotations, startingWordIndex);
+    if (!highlightLayer.isConnected || highlightLayer.parentElement !== root) {
+      root.append(highlightLayer);
+    }
+    if (!markerLayer.isConnected) {
+      document.body.append(markerLayer);
+    }
+    if (!tooltipLayer.isConnected) {
+      document.body.append(tooltipLayer);
+    }
+
+    annotationsById.clear();
+    currentWordAnnotations.forEach((annotation) => {
+      annotationsById.set(annotation.id, annotation);
+    });
+
+    if (activeAnnotationId && !annotationsById.has(activeAnnotationId)) {
+      activeAnnotationId = null;
+      activeAnnotationRegistry.set(root, null);
+    }
+
+    const renderedTokenRects = collectRenderedTokenRects(root, currentWordAnnotations, currentStartingWordIndex);
     const geometries = buildAnnotationGeometries(root, annotationsById, renderedTokenRects);
     drawTokenRects(highlightLayer, geometries);
-    drawMarkers(markerLayer, tooltipLayer, geometries);
+    drawMarkers(markerLayer, tooltipLayer, geometries, activeAnnotationId, setActiveAnnotationId);
 
-    if (documentModel) {
-      logBodyTokenValidation(documentModel, annotationsById, renderedTokenRects);
+    if (currentDocumentModel) {
+      logBodyTokenValidation(currentDocumentModel, annotationsById, renderedTokenRects);
     }
   };
 
@@ -85,13 +131,24 @@ export const applyHighlightsToContainer = (
     window.removeEventListener('scroll', handleWindowChange, true);
     window.removeEventListener('resize', handleWindowChange);
     resizeObserver.disconnect();
+    activeAnnotationRegistry.set(root, activeAnnotationId);
     markerLayer.remove();
     tooltipLayer.remove();
     highlightLayer.remove();
     cleanupRegistry.delete(root);
+    controllerRegistry.delete(root);
   };
 
   cleanupRegistry.set(root, cleanup);
+  controllerRegistry.set(root, {
+    cleanup,
+    rerender: (config) => {
+      currentWordAnnotations = config.wordAnnotations;
+      currentStartingWordIndex = config.startingWordIndex;
+      currentDocumentModel = config.documentModel;
+      rerender();
+    },
+  });
 
   return cleanup;
 };
@@ -235,7 +292,9 @@ const drawTokenRects = (
 const drawMarkers = (
   markerLayer: HTMLElement,
   tooltipLayer: HTMLElement,
-  geometries: AnnotationGeometry[]
+  geometries: AnnotationGeometry[],
+  activeAnnotationId: string | null,
+  setActiveAnnotationId: (annotationId: string | null) => void
 ) => {
   markerLayer.innerHTML = '';
   tooltipLayer.innerHTML = '';
@@ -254,6 +313,7 @@ const drawMarkers = (
     button.type = 'button';
     button.className = 'document-review-marker-button';
     button.setAttribute('aria-label', 'Open chunk feedback');
+    button.setAttribute('aria-expanded', activeAnnotationId === geometry.annotation.id ? 'true' : 'false');
     button.innerHTML = `
       <svg aria-hidden="true" viewBox="0 0 24 24" class="document-review-marker-icon">
         <circle cx="12" cy="12" r="8.15" fill="none" stroke="currentColor" stroke-width="1.9" />
@@ -264,66 +324,49 @@ const drawMarkers = (
 
     const tooltip = document.createElement('div');
     tooltip.className = 'document-review-marker-tooltip';
+    tooltip.dataset.open = activeAnnotationId === geometry.annotation.id ? 'true' : 'false';
+    tooltip.setAttribute('role', 'dialog');
+
+    const header = document.createElement('div');
+    header.className = 'document-review-marker-tooltip-header';
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'document-review-marker-tooltip-close';
+    closeButton.setAttribute('aria-label', 'Close feedback');
+    closeButton.textContent = '×';
 
     const body = document.createElement('p');
     body.className = 'document-review-marker-tooltip-body';
     body.textContent = geometry.annotation.comment;
 
-    tooltip.style.left = `${geometry.markerAnchor.left}px`;
-    tooltip.style.top = `${geometry.markerAnchor.top}px`;
+    const preferredLeft = geometry.markerAnchor.left + 12;
+    const tooltipMaxWidth = Math.min(448, window.innerWidth * 0.48);
+    const clampedLeft = Math.min(
+      preferredLeft,
+      Math.max(30, window.innerWidth - tooltipMaxWidth - 30)
+    );
+
+    tooltip.style.left = `${clampedLeft}px`;
+    tooltip.style.top = `${geometry.markerAnchor.top + 20}px`;
+    header.append(closeButton);
+    tooltip.append(header);
     tooltip.append(body);
 
-    let isButtonHovered = false;
-    let isTooltipHovered = false;
-    let hideTimeout: number | null = null;
+    marker.dataset.open = activeAnnotationId === geometry.annotation.id ? 'true' : 'false';
 
-    const syncOpenState = () => {
-      const isOpen = isButtonHovered || isTooltipHovered;
-      marker.dataset.open = isOpen ? 'true' : 'false';
-      tooltip.dataset.open = isOpen ? 'true' : 'false';
-    };
-
-    const clearHideTimeout = () => {
-      if (hideTimeout !== null) {
-        window.clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-    };
-
-    const scheduleClose = () => {
-      clearHideTimeout();
-      hideTimeout = window.setTimeout(() => {
-        syncOpenState();
-      }, 24);
-    };
-
-    button.addEventListener('mouseenter', () => {
-      clearHideTimeout();
-      isButtonHovered = true;
-      syncOpenState();
-    });
-    button.addEventListener('mouseleave', () => {
-      isButtonHovered = false;
-      scheduleClose();
-    });
-    button.addEventListener('focus', () => {
-      clearHideTimeout();
-      isButtonHovered = true;
-      syncOpenState();
-    });
-    button.addEventListener('blur', () => {
-      isButtonHovered = false;
-      scheduleClose();
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setActiveAnnotationId(
+        activeAnnotationId === geometry.annotation.id ? null : geometry.annotation.id
+      );
     });
 
-    tooltip.addEventListener('mouseenter', () => {
-      clearHideTimeout();
-      isTooltipHovered = true;
-      syncOpenState();
-    });
-    tooltip.addEventListener('mouseleave', () => {
-      isTooltipHovered = false;
-      scheduleClose();
+    closeButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setActiveAnnotationId(null);
     });
 
     marker.append(button);

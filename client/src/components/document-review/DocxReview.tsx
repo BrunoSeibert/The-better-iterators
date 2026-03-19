@@ -88,7 +88,16 @@ export default function DocxReview({ document }: DocxReviewProps) {
         clearReviewAnnotations(renderContainer);
       }
     };
-  }, [document.arrayBuffer, wordAnnotations]);
+  }, [document.arrayBuffer]);
+
+  useEffect(() => {
+    const renderContainer = renderContainerRef.current;
+    if (!renderContainer || renderContainer.childElementCount === 0) {
+      return;
+    }
+
+    applyHighlightsToContainer(renderContainer, wordAnnotations, 0, document);
+  }, [document, wordAnnotations]);
 
   if (renderError) {
     return (

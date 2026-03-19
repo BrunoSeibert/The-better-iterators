@@ -266,7 +266,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
     <div className="flex h-full w-full flex-col gap-0 overflow-y-auto">
 
       {/* Step indicator */}
-      <div className="sticky top-0 z-10 border-b border-neutral-200 bg-white px-6 py-3">
+      <div className="sticky top-0 z-10 bg-transparent px-6 py-3">
         <div className="flex items-center gap-1.5">
           {STEP_META.map((s, i) => (
             <div key={s.key} className="flex items-center gap-1.5">
@@ -313,14 +313,14 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
             <div className="flex gap-3">
               <button
                 onClick={copyProposal}
-                className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
+                className="rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
                 style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
               >
                 Copy to clipboard
               </button>
               <button
                 onClick={resetProposal}
-                className="rounded-2xl border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-50"
+                className="rounded-lg border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-50"
               >
                 Start over
               </button>
@@ -373,7 +373,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
             <button
               onClick={() => getFeedback()}
               disabled={loading || (step === 0 ? !state.topic.title.trim() : !currentContent.trim())}
-              className="self-start rounded-2xl border border-neutral-200 px-5 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-40"
+              className="self-start rounded-lg border border-neutral-200 px-5 py-2 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-40"
             >
               {loading ? 'Getting feedback…' : renderedFeedback.length > 0 ? 'Re-evaluate' : 'Get AI feedback'}
             </button>
@@ -416,7 +416,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
                               </div>
                               <button
                                 onClick={() => applySuggestion(entry.suggestion!)}
-                                className="shrink-0 rounded-xl border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition"
+                                className="shrink-0 rounded-md border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition"
                               >
                                 Apply
                               </button>
@@ -440,7 +440,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
                   <button
                     onClick={handleFollowUp}
                     disabled={!followUp.trim() || loading}
-                    className="rounded-2xl px-4 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
+                    className="rounded-lg px-4 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
                     style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                   >
                     Ask
@@ -456,7 +456,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
           {step > 0 && step < 5 && (
             <button
               onClick={handleBack}
-              className="rounded-2xl border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-50"
+              className="rounded-lg border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-600 transition hover:bg-neutral-50"
             >
               ← Back
             </button>
@@ -465,7 +465,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
             <button
               onClick={handleNext}
               disabled={!canAdvance || generating}
-              className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
               style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
             >
               {step === 4 ? (generating ? 'Generating…' : 'Generate Proposal →') : 'Next →'}

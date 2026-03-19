@@ -70,7 +70,13 @@ export const applyAiSelectionToChunks = (
   const seen = new Set<number>();
 
   aiAnnotations.forEach((aiAnnotation) => {
+    const normalizedType = normalizeAiAnnotationType(aiAnnotation.type);
+
     if (seen.has(aiAnnotation.chunkIndex)) {
+      return;
+    }
+
+    if (!normalizedType || typeof aiAnnotation.feedback !== 'string') {
       return;
     }
 
@@ -82,12 +88,28 @@ export const applyAiSelectionToChunks = (
     seen.add(aiAnnotation.chunkIndex);
     selected.push({
       ...chunk,
-      type: aiAnnotation.type,
+      type: normalizedType,
       comment: aiAnnotation.feedback.trim(),
     });
   });
 
   return selected;
+};
+
+const normalizeAiAnnotationType = (value: string): AnnotationType | null => {
+  if (value === 'green' || value === 'orange' || value === 'red') {
+    return value;
+  }
+
+  if (value === 'good') {
+    return 'green';
+  }
+
+  if (value === 'improve') {
+    return 'orange';
+  }
+
+  return null;
 };
 
 const collectParagraphBoundChunk = (

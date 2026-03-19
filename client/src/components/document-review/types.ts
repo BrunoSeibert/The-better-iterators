@@ -1,8 +1,9 @@
 export type ReviewFileKind = 'pdf' | 'docx';
 
 export type AnnotationType =
-  | 'good'
-  | 'improve'
+  | 'green'
+  | 'orange'
+  | 'red'
   | 'debug_green'
   | 'debug_orange'
   | 'debug_red'
@@ -57,7 +58,7 @@ export type ReviewChunkPayload = {
 
 export type ReviewAiAnnotation = {
   chunkIndex: number;
-  type: 'good' | 'improve';
+  type: 'green' | 'orange' | 'red';
   feedback: string;
 };
 

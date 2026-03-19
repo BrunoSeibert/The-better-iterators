@@ -1,20 +1,20 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuthStore } from '@/store/authStore';
 
 const C = {
-  darkBrown:  'rgba(38,38,38,1)',
-  midBrown:   'rgba(82,82,91,1)',
-  tan:        'rgba(161,161,170,1)',
-  lightTan:   'rgba(228,228,231,1)',
-  cream:      'rgba(250,250,250,1)',
-  warmWhite:  'rgba(244,244,245,1)',
-  border:     'rgba(212,212,216,1)',
-  mutedText:  'rgba(113,113,122,1)',
-  uniPin:     'rgba(81,60,45,1)',
+  darkBrown: 'rgba(38,38,38,1)',
+  midBrown: 'rgba(82,82,91,1)',
+  tan: 'rgba(161,161,170,1)',
+  lightTan: 'rgba(228,228,231,1)',
+  cream: 'rgba(250,250,250,1)',
+  warmWhite: 'rgba(244,244,245,1)',
+  border: 'rgba(212,212,216,1)',
+  mutedText: 'rgba(113,113,122,1)',
+  uniPin: 'rgba(81,60,45,1)',
 };
 
 export interface Professor {
@@ -99,14 +99,14 @@ export default function Level2() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedUniversity = universities.find(u => u.id === selectedUniversityId) ?? null;
+  const selectedUniversity = universities.find((u) => u.id === selectedUniversityId) ?? null;
   const selectedProfessors = professors
-    .filter(p => p.universityId === selectedUniversityId)
+    .filter((p) => p.universityId === selectedUniversityId)
     .sort((a, b) => b.match - a.match);
 
-  const selectedCompany = companies.find(c => c.id === selectedCompanyId) ?? null;
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId) ?? null;
   const selectedExperts = experts
-    .filter(e => e.companyId === selectedCompanyId)
+    .filter((e) => e.companyId === selectedCompanyId)
     .sort((a, b) => b.match - a.match);
 
   const closeSidebar = useCallback(() => {
@@ -117,26 +117,39 @@ export default function Level2() {
   const fetchMatches = useCallback(() => {
     setLoading(true);
     setError(null);
+
     fetch('/api/map/matches', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-      .then(r => { if (!r.ok) throw new Error(`Server error ${r.status}`); return r.json(); })
-      .then((data: { universities: MapUniversity[]; professors: Professor[]; companies: MapCompany[]; experts: Expert[] }) => {
-        if (!data.universities) throw new Error('Unexpected response format');
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Server error ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data: { universities?: MapUniversity[]; professors?: Professor[]; companies?: MapCompany[]; experts?: Expert[] }) => {
+        if (!Array.isArray(data.universities)) {
+          throw new Error('Unexpected response format');
+        }
         setUniversities(data.universities);
-        setProfessors(data.professors ?? []);
-        setCompanies(data.companies ?? []);
-        setExperts(data.experts ?? []);
+        setProfessors(Array.isArray(data.professors) ? data.professors : []);
+        setCompanies(Array.isArray(data.companies) ? data.companies : []);
+        setExperts(Array.isArray(data.experts) ? data.experts : []);
         setLoading(false);
       })
-      .catch((e: Error) => { setError(e.message); setLoading(false); });
+      .catch((e: Error) => {
+        setError(e.message);
+        setLoading(false);
+      });
   }, [token]);
 
-  useEffect(() => { fetchMatches(); }, [fetchMatches]);
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
 
-  // Initialize map once when loading finishes
   useEffect(() => {
     if (!containerRef.current || mapRef.current || loading) return;
+
     mapRef.current = L.map(containerRef.current).setView([47.3769, 8.5417], 8);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -145,33 +158,56 @@ export default function Level2() {
     }).addTo(mapRef.current);
   }, [loading]);
 
-  // Re-place markers whenever data or filter changes
   useEffect(() => {
     if (!mapRef.current) return;
-    mapRef.current.eachLayer(layer => {
-      if (layer instanceof L.Marker) mapRef.current!.removeLayer(layer);
+
+    mapRef.current.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        mapRef.current!.removeLayer(layer);
+      }
     });
+
     if (filter !== 'companies') {
-      universities.forEach(uni => {
-        const marker = L.marker([Number(uni.lat), Number(uni.lng)], { icon: makeMarkerIcon(uni.match, C.uniPin) })
-          .addTo(mapRef.current!);
-        marker.bindPopup(`<b style="color:rgba(38,38,38,1)">${uni.name}</b><br/><small style="color:rgba(113,113,122,1)">${Math.round(uni.match * 100)}% match · click to see professors</small>`);
-        marker.on('click', () => { setSelectedUniversityId(uni.id); setSelectedCompanyId(null); marker.openPopup(); });
+      universities.forEach((uni) => {
+        const marker = L.marker([Number(uni.lat), Number(uni.lng)], {
+          icon: makeMarkerIcon(uni.match, C.uniPin),
+        }).addTo(mapRef.current!);
+
+        marker.bindPopup(
+          `<b style="color:rgba(38,38,38,1)">${uni.name}</b><br/><small style="color:rgba(113,113,122,1)">${Math.round(uni.match * 100)}% match · click to see professors</small>`,
+        );
+        marker.on('click', () => {
+          setSelectedUniversityId(uni.id);
+          setSelectedCompanyId(null);
+          marker.openPopup();
+        });
       });
     }
+
     if (filter !== 'universities') {
-      companies.forEach(co => {
-        const marker = L.marker([Number(co.lat), Number(co.lng)], { icon: makeMarkerIcon(co.match, C.midBrown) })
-          .addTo(mapRef.current!);
-        marker.bindPopup(`<b style="color:rgba(38,38,38,1)">${co.name}</b><br/><small style="color:rgba(113,113,122,1)">${Math.round(co.match * 100)}% match · click to see experts</small>`);
-        marker.on('click', () => { setSelectedCompanyId(co.id); setSelectedUniversityId(null); marker.openPopup(); });
+      companies.forEach((company) => {
+        const marker = L.marker([Number(company.lat), Number(company.lng)], {
+          icon: makeMarkerIcon(company.match, C.midBrown),
+        }).addTo(mapRef.current!);
+
+        marker.bindPopup(
+          `<b style="color:rgba(38,38,38,1)">${company.name}</b><br/><small style="color:rgba(113,113,122,1)">${Math.round(company.match * 100)}% match · click to see experts</small>`,
+        );
+        marker.on('click', () => {
+          setSelectedCompanyId(company.id);
+          setSelectedUniversityId(null);
+          marker.openPopup();
+        });
       });
     }
+
     setTimeout(() => mapRef.current?.invalidateSize(), 100);
   }, [universities, companies, filter]);
 
   useEffect(() => {
-    if (mapRef.current) setTimeout(() => mapRef.current?.invalidateSize(), 50);
+    if (mapRef.current) {
+      setTimeout(() => mapRef.current?.invalidateSize(), 50);
+    }
   }, [selectedUniversityId, selectedCompanyId]);
 
   const sidebarOpen = selectedUniversity !== null || selectedCompany !== null;
@@ -180,22 +216,38 @@ export default function Level2() {
     return (
       <div className="h-full w-full space-y-6 rounded-lg p-6" style={{ backgroundColor: C.warmWhite }}>
         <div>
-          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor or Expert</h1>
-          <p className="mt-1 text-sm" style={{ color: C.mutedText }}>{error ? 'Failed to load matches' : 'Computing AI matches…'}</p>
+          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor</h1>
+          <p className="mt-1 text-sm" style={{ color: C.mutedText }}>
+            {error ? 'Failed to load matches' : 'Computing AI matches...'}
+          </p>
         </div>
-        <div className="relative flex h-[calc(100%-5rem)] items-center justify-center rounded-2xl" style={{ border: `2px solid ${C.border}`, backgroundColor: C.cream }}>
+        <div
+          className="relative flex h-[calc(100%-5rem)] items-center justify-center rounded-none"
+          style={{ border: `3px solid ${C.border}`, backgroundColor: C.cream }}
+        >
           {error ? (
-            <div className="flex flex-col items-center gap-3 text-center px-8">
+            <div className="flex flex-col items-center gap-3 px-8 text-center">
               <p className="text-sm font-semibold" style={{ color: C.darkBrown }}>Could not load matches</p>
               <p className="text-xs" style={{ color: C.mutedText }}>{error}</p>
-              <button onClick={fetchMatches} style={{ marginTop: 8, padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}>
+              <button
+                onClick={fetchMatches}
+                className="rounded-[0.32rem] border-2 px-5 py-2 text-sm font-semibold transition"
+                style={{
+                  borderColor: 'black',
+                  backgroundColor: 'black',
+                  color: 'white',
+                }}
+              >
                 Retry
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
-              <div className="h-10 w-10 animate-spin rounded-full border-[3px]" style={{ borderColor: C.lightTan, borderTopColor: C.darkBrown }} />
-              <p className="text-sm font-semibold" style={{ color: C.darkBrown }}>Computing AI matches…</p>
+              <div
+                className="h-10 w-10 animate-spin rounded-full border-[3px]"
+                style={{ borderColor: C.lightTan, borderTopColor: C.darkBrown }}
+              />
+              <p className="text-sm font-semibold" style={{ color: C.darkBrown }}>Loading map...</p>
             </div>
           )}
         </div>
@@ -205,113 +257,134 @@ export default function Level2() {
 
   return (
     <div className="flex h-full w-full flex-col gap-4 rounded-lg p-6" style={{ backgroundColor: C.warmWhite }}>
-      {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex shrink-0 items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor or Expert</h1>
+          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor</h1>
           <p className="mt-1 text-sm" style={{ color: C.mutedText }}>
             {universities.length} universities · {companies.length} companies matched to your profile
           </p>
         </div>
-        {/* Filter buttons */}
-        <div className="flex shrink-0 items-center gap-1 rounded-xl p-1" style={{ backgroundColor: C.lightTan }}>
+        <div className="flex items-center gap-2">
           {([
-            { key: 'all', label: 'All' },
-            { key: 'universities', label: 'Universities', color: C.uniPin },
-            { key: 'companies', label: 'Companies', color: C.midBrown },
-          ] as const).map(({ key, label, color }) => (
+            { key: 'all', label: `All (${universities.length + companies.length})` },
+            { key: 'companies', label: 'Companies' },
+            { key: 'universities', label: 'Universities' },
+          ] as const).map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => { setFilter(key); closeSidebar(); }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-              style={{
-                backgroundColor: filter === key ? C.cream : 'transparent',
-                color: filter === key ? C.darkBrown : C.mutedText,
-                boxShadow: filter === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
+              onClick={() => {
+                setFilter(key);
+                closeSidebar();
               }}
+              className={`rounded-[0.32rem] border-2 px-[clamp(0.85rem,2.8vw,1.25rem)] py-[clamp(0.42rem,1.5vw,0.5rem)] text-[clamp(0.95rem,2.5vw,1rem)] font-semibold transition ${
+                filter === key
+                  ? 'border-black bg-black text-white hover:bg-[rgba(28,28,28,1)]'
+                  : 'border-[rgba(178,178,178,0.98)] bg-[rgba(236,236,236,0.98)] text-[rgba(68,68,68,1)] hover:bg-[rgba(225,225,225,0.98)]'
+              }`}
             >
-              {color && <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />}
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Map + sidebar row */}
-      <div className="flex flex-1 min-h-0 gap-3">
-
-        {/* Map */}
-        <div className="relative flex-1 min-w-0 overflow-hidden rounded-2xl" style={{ border: `2px solid ${C.border}`, isolation: 'isolate' }}>
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div
+          className="relative min-w-0 flex-1 overflow-hidden rounded-none"
+          style={{ border: `3px solid ${C.border}`, isolation: 'isolate' }}
+        >
           <div ref={containerRef} className="absolute inset-0 leaflet-container" />
         </div>
 
-        {/* Sidebar */}
         {sidebarOpen && (
           <div
-            className="shrink-0 flex flex-col overflow-hidden rounded-2xl"
+            className="flex shrink-0 flex-col overflow-hidden rounded-lg"
             style={{ width: 300, backgroundColor: C.cream, border: `2px solid ${C.border}` }}
           >
-            {/* Sidebar header */}
-            <div className="flex items-center justify-between px-4 py-4 shrink-0" style={{ borderBottom: `1px solid ${C.border}` }}>
+            <div
+              className="flex shrink-0 items-center justify-between px-4 py-4"
+              style={{ borderBottom: `1px solid ${C.border}` }}
+            >
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: C.mutedText }}>
                   {selectedUniversity ? 'Professors at' : 'Experts at'}
                 </p>
-                <p className="truncate text-sm font-bold mt-0.5" style={{ color: C.darkBrown }}>
+                <p className="mt-0.5 truncate text-sm font-bold" style={{ color: C.darkBrown }}>
                   {selectedUniversity?.name ?? selectedCompany?.name}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: C.mutedText }}>
+                <p className="mt-0.5 text-xs" style={{ color: C.mutedText }}>
                   {selectedUniversity ? `${selectedProfessors.length} professors` : `${selectedExperts.length} experts`}
                 </p>
               </div>
               <button
                 onClick={closeSidebar}
-                style={{ flexShrink: 0, marginLeft: 8, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 8px' }}
+                style={{
+                  flexShrink: 0,
+                  marginLeft: 8,
+                  color: C.mutedText,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: '4px 8px',
+                }}
               >
-                ✕
+                x
               </button>
             </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto flex flex-col gap-3 p-4" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" style={{ scrollbarWidth: 'thin' }}>
               {selectedUniversity && (
                 selectedProfessors.length === 0 ? (
-                  <p className="text-sm text-center mt-8" style={{ color: C.mutedText }}>No professors found.</p>
+                  <p className="mt-8 text-center text-sm" style={{ color: C.mutedText }}>No professors found.</p>
                 ) : (
-                  selectedProfessors.map(prof => (
+                  selectedProfessors.map((prof) => (
                     <button
                       key={prof.id}
                       onClick={() => navigate(`/professor/${prof.id}`, { state: { professor: prof } })}
-                      className="flex flex-col gap-3 rounded-xl p-4 text-left transition hover:shadow-md"
+                      className="flex flex-col gap-3 rounded-lg p-4 text-left transition hover:shadow-md"
                       style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, cursor: 'pointer' }}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: C.lightTan, color: C.darkBrown }}>
+                        <div
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                          style={{ backgroundColor: C.lightTan, color: C.darkBrown }}
+                        >
                           {prof.firstName[0]}{prof.lastName[0]}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold" style={{ color: C.darkBrown }}>{prof.firstName} {prof.lastName}</p>
+                          <p className="truncate text-sm font-bold" style={{ color: C.darkBrown }}>
+                            {prof.firstName} {prof.lastName}
+                          </p>
                           <p className="truncate text-xs" style={{ color: C.mutedText }}>{prof.title}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: C.lightTan }}>
-                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(prof.match * 100)}%`, backgroundColor: C.darkBrown }} />
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: C.lightTan }}>
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${Math.round(prof.match * 100)}%`, backgroundColor: C.darkBrown }}
+                          />
                         </div>
-                        <span className="text-xs font-bold shrink-0" style={{ color: C.darkBrown }}>{Math.round(prof.match * 100)}%</span>
+                        <span className="shrink-0 text-xs font-bold" style={{ color: C.darkBrown }}>
+                          {Math.round(prof.match * 100)}%
+                        </span>
                       </div>
                       {prof.researchInterests.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {prof.researchInterests.slice(0, 3).map(interest => (
-                            <span key={interest} className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: C.lightTan, color: C.midBrown }}>
+                          {prof.researchInterests.slice(0, 3).map((interest) => (
+                            <span
+                              key={interest}
+                              className="rounded-full px-2 py-0.5 text-xs"
+                              style={{ backgroundColor: C.lightTan, color: C.midBrown }}
+                            >
                               {interest}
                             </span>
                           ))}
                         </div>
                       )}
-                      <p className="text-xs font-medium" style={{ color: C.tan }}>View profile →</p>
+                      <p className="text-xs font-medium" style={{ color: C.tan }}>View profile -&gt;</p>
                     </button>
                   ))
                 )
@@ -319,34 +392,48 @@ export default function Level2() {
 
               {selectedCompany && (
                 selectedExperts.length === 0 ? (
-                  <p className="text-sm text-center mt-8" style={{ color: C.mutedText }}>No experts found.</p>
+                  <p className="mt-8 text-center text-sm" style={{ color: C.mutedText }}>No experts found.</p>
                 ) : (
-                  selectedExperts.map(expert => (
+                  selectedExperts.map((expert) => (
                     <button
                       key={expert.id}
                       onClick={() => navigate(`/expert/${expert.id}`, { state: { expert } })}
-                      className="flex flex-col gap-3 rounded-xl p-4 text-left transition hover:shadow-md"
+                      className="flex flex-col gap-3 rounded-lg p-4 text-left transition hover:shadow-md"
                       style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, cursor: 'pointer' }}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: C.lightTan, color: C.midBrown }}>
+                        <div
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                          style={{ backgroundColor: C.lightTan, color: C.midBrown }}
+                        >
                           {expert.firstName[0]}{expert.lastName[0]}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold" style={{ color: C.darkBrown }}>{expert.firstName} {expert.lastName}</p>
+                          <p className="truncate text-sm font-bold" style={{ color: C.darkBrown }}>
+                            {expert.firstName} {expert.lastName}
+                          </p>
                           <p className="truncate text-xs" style={{ color: C.mutedText }}>{expert.title}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ backgroundColor: C.lightTan }}>
-                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(expert.match * 100)}%`, backgroundColor: C.midBrown }} />
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: C.lightTan }}>
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${Math.round(expert.match * 100)}%`, backgroundColor: C.midBrown }}
+                          />
                         </div>
-                        <span className="text-xs font-bold shrink-0" style={{ color: C.midBrown }}>{Math.round(expert.match * 100)}%</span>
+                        <span className="shrink-0 text-xs font-bold" style={{ color: C.midBrown }}>
+                          {Math.round(expert.match * 100)}%
+                        </span>
                       </div>
                       {expert.companyDomains.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {expert.companyDomains.slice(0, 3).map(domain => (
-                            <span key={domain} className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: C.lightTan, color: C.midBrown }}>
+                          {expert.companyDomains.slice(0, 3).map((domain) => (
+                            <span
+                              key={domain}
+                              className="rounded-full px-2 py-0.5 text-xs"
+                              style={{ backgroundColor: C.lightTan, color: C.midBrown }}
+                            >
                               {domain}
                             </span>
                           ))}
@@ -355,7 +442,7 @@ export default function Level2() {
                       {expert.offerInterviews && (
                         <span className="text-xs font-semibold" style={{ color: C.darkBrown }}>Offers interviews</span>
                       )}
-                      <p className="text-xs font-medium" style={{ color: C.tan }}>View profile →</p>
+                      <p className="text-xs font-medium" style={{ color: C.tan }}>View profile -&gt;</p>
                     </button>
                   ))
                 )

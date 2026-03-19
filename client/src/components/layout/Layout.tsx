@@ -22,6 +22,7 @@ import { DocumentReview } from '../document-review';
 import ThesisPresentationTestMode from '../presentation-test/ThesisPresentationTestMode';
 import studyonLogo from '@/assets/Study_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
+import scienceBadgerImage from '@/assets/ScienceBadger.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
 import AchievementToast from '../AchievementToast';
@@ -637,35 +638,21 @@ const closeAssistant = () => {
         </div>
       )}
       <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-neutral-800 px-4 sm:px-6 lg:px-8">
+        <img
+          src={studyonLogo}
+          alt="Studyon logo"
+          className="h-12 w-12 object-contain brightness-0 invert"
+        />
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          className="ml-2 flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Back to Dashboard"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/>
           </svg>
           <span className="text-sm font-medium">Dashboard</span>
-        </button>
-        <img
-          src={studyonLogo}
-          alt="Studyon logo"
-          className="h-12 w-12 object-contain brightness-0 invert ml-2"
-        />
-        <button
-          type="button"
-          onClick={() => navigate('/streak')}
-          className="ml-4 flex items-center gap-1.5 rounded-md px-5 py-2.5 text-orange-400 transition hover:bg-white/5"
-          aria-label="Open streak page"
-        >
-          <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
-          <span
-            className="text-[1.45rem] leading-none text-orange-400"
-            style={{ fontFamily: '"Arial Black", "Avenir Next", sans-serif', fontWeight: 900 }}
-          >
-            {dailyStreak === null ? '...' : dailyStreak}
-          </span>
         </button>
         <div className="ml-8 flex items-center gap-3 lg:ml-12">
           <button
@@ -677,7 +664,7 @@ const closeAssistant = () => {
             Reset Level
           </button>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
         
           <button
             onClick={handleCheckinButtonClick}
@@ -706,6 +693,20 @@ const closeAssistant = () => {
         </div>
         <button
           type="button"
+          onClick={() => navigate('/streak')}
+          className="flex items-center gap-1.5 rounded-md px-5 py-2.5 text-orange-400 transition hover:bg-white/5"
+          aria-label="Open streak page"
+        >
+          <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
+          <span
+            className="text-[1.45rem] leading-none text-orange-400"
+            style={{ fontFamily: '"Arial Black", "Avenir Next", sans-serif', fontWeight: 900 }}
+          >
+            {dailyStreak === null ? '...' : dailyStreak}
+          </span>
+        </button>
+        <button
+          type="button"
           onClick={() => navigate('/profile', { state: { returnTo: '/app' } })}
           className="flex items-center gap-2 rounded-md px-5 py-3 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Profile"
@@ -723,7 +724,7 @@ const closeAssistant = () => {
         className="min-h-screen pt-[max(10vh,72px)] transition-[padding-right] duration-200"
         style={{ paddingRight: assistantOpen ? assistantPanelWidth : '0px' }}
       >
-        <section className="flex h-[calc(100vh-max(10vh,72px))] min-w-0 flex-col">
+        <section className={`flex min-w-0 flex-col ${activeLevel === 6 ? 'min-h-[calc(100vh-max(10vh,72px))]' : 'h-[calc(100vh-max(10vh,72px))]'}`}>
           <div className="flex h-[10vh] min-h-[88px] items-center border-b border-neutral-300 bg-neutral-100 px-4 sm:px-6 lg:px-8">
             <div
               ref={roadmapRef}
@@ -800,11 +801,13 @@ const closeAssistant = () => {
             </div>
           )}
 
-          <div className="flex flex-1 min-h-0 overflow-hidden bg-white px-2 py-2 sm:px-3 sm:py-3">
+          <div className={`flex bg-white px-2 py-2 sm:px-3 sm:py-3 ${activeLevel === 6 ? 'min-h-0 flex-1 overflow-visible' : 'min-h-0 flex-1 overflow-hidden'}`}>
             <div
               className={`flex flex-1 min-h-0 rounded-md ${
                 levelSixCorrecting || activeLevel === 2
-                  ? 'bg-transparent p-0 overflow-hidden'
+                  ? 'bg-transparent p-0 overflow-y-auto overflow-x-hidden'
+                  : activeLevel === 6
+                    ? 'bg-neutral-200/70 p-3 overflow-visible'
                   : 'bg-neutral-200/70 p-3 overflow-y-auto'
               }`}
             >
@@ -822,10 +825,17 @@ const closeAssistant = () => {
                     />
                   ) : null
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-                    <div className="w-full text-left">
-                      <h2 className="text-3xl font-semibold text-neutral-800">Writing</h2>
-                      <p className="mt-1 text-sm text-neutral-500">Get Feedback from our Badger AI</p>
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-4 overflow-visible">
+                    <div className="relative z-10 flex w-full items-start overflow-visible">
+                      <div className="max-w-[34rem] flex-1 pl-4 text-left pr-40">
+                        <h2 className="text-3xl font-semibold text-neutral-800">Get Thesis Feedback</h2>
+                        <p className="mt-2 text-sm leading-6 text-neutral-500">Upload your draft to see detailed comments on what works and what to improve.</p>
+                      </div>
+                      <img
+                        src={scienceBadgerImage}
+                        alt="Science badger mascot"
+                        className="pointer-events-none absolute left-[80%] -top-1 z-20 h-40 w-40 -translate-x-1/2 object-contain"
+                      />
                     </div>
                     <label
                       onDragOver={(event) => {

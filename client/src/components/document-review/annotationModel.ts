@@ -9,12 +9,16 @@ import type {
 const reviewWordPattern = /[\p{L}\p{N}][\p{L}\p{N}'Ã¢â‚¬â„¢-]*/gu;
 
 export const annotationTones: Record<AnnotationType, AnnotationTone> = {
-  good: {
+  green: {
     background: 'rgba(187, 247, 208, 0.42)',
     outline: 'rgba(0, 0, 0, 0)',
   },
-  improve: {
+  orange: {
     background: 'rgba(254, 215, 170, 0.42)',
+    outline: 'rgba(0, 0, 0, 0)',
+  },
+  red: {
+    background: 'rgba(254, 202, 202, 0.42)',
     outline: 'rgba(0, 0, 0, 0)',
   },
   debug_green: {

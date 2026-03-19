@@ -15,6 +15,21 @@ type PdfReviewProps = {
 
 const PAGE_FRAME_PADDING = 10;
 
+const applyPageHighlights = (
+  pageRoot: HTMLDivElement | null,
+  pageModel: ParsedPdfPage | undefined,
+  wordAnnotations: Map<number, ReviewAnnotation>,
+  documentModel: ParsedPdfReview
+) => {
+  const textLayer = pageRoot?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
+
+  if (!textLayer || !pageModel) {
+    return;
+  }
+
+  applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
+};
+
 export default function PdfReview({ document, availableWidth }: PdfReviewProps) {
   const [pageCount, setPageCount] = useState(document.pageCount);
   const renderWidth = Math.max(
@@ -82,18 +97,17 @@ function PdfReviewPage({
   const pageRootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const textLayer = pageRootRef.current?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
+    applyPageHighlights(pageRootRef.current, pageModel, wordAnnotations, documentModel);
+  }, [documentModel, pageModel, wordAnnotations]);
 
-    if (!textLayer || !pageModel) {
-      return;
-    }
-
-    applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
-
+  useEffect(() => {
     return () => {
-      clearReviewAnnotations(textLayer);
+      const textLayer = pageRootRef.current?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
+      if (textLayer) {
+        clearReviewAnnotations(textLayer);
+      }
     };
-  }, [documentModel, pageModel, renderWidth, wordAnnotations]);
+  }, []);
 
   return (
     <div
@@ -108,11 +122,7 @@ function PdfReviewPage({
           renderTextLayer
           className="document-review-pdf-page"
           onRenderTextLayerSuccess={() => {
-            const textLayer = pageRootRef.current?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
-
-            if (textLayer && pageModel) {
-              applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
-            }
+            applyPageHighlights(pageRootRef.current, pageModel, wordAnnotations, documentModel);
           }}
         />
       </div>
