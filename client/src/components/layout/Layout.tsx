@@ -12,6 +12,7 @@ import {
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
 import Level2 from '@/pages/Level2';
+import LiteratureReview from '@/pages/LiteratureReview';
 import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
@@ -538,6 +539,7 @@ export default function Layout() {
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
               {activeLevel === 2 && <Level2 />}
+              {activeLevel === 3 && <LiteratureReview />}
               {activeLevel === 6 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (

@@ -89,6 +89,58 @@ export async function getStreakSummary() {
   };
 }
 
+export type StarterPaper = {
+  title: string;
+  authors: string;
+  year?: string;
+  why: string;
+  isMethodology?: boolean;
+};
+
+export type Phase1Data = {
+  searchTerms: string[];
+  databases: { name: string; url?: string; description: string }[];
+  starterPapers: StarterPaper[];
+};
+
+export type PaperAnalysis = {
+  input: string;
+  coreThemes: string[];
+  thesisRelevance: string;
+  relatedTerms: string[];
+  followUpPapers: { title: string; authors: string; year?: string; why: string }[];
+};
+
+export async function literatureStart(): Promise<Phase1Data> {
+  const res = await api.post('/literature', { phase: 1 });
+  return res.data;
+}
+
+export type TopicSuggestion = {
+  id: string;
+  title: string;
+  description: string;
+  field_names: string[];
+  reason: string;
+};
+
+export async function literatureSuggestTopics(
+  papers: PaperAnalysis[],
+  feedback: Record<number, 'liked' | 'disliked'>
+): Promise<TopicSuggestion[]> {
+  const res = await api.post('/literature', { phase: 3, papers, feedback });
+  return res.data.suggestions;
+}
+
+export async function literatureAnalyze(
+  input: string,
+  papers: PaperAnalysis[],
+  feedback: Record<number, 'liked' | 'disliked'>
+): Promise<PaperAnalysis> {
+  const res = await api.post('/literature', { phase: 2, input, papers, feedback });
+  return { ...res.data, input };
+}
+
 export async function completeOnboarding(data: {
   currentLevel: number;
   completedStages: number[];

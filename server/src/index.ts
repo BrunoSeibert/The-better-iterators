@@ -22,10 +22,12 @@ import { chatRouter } from './routes/chat';
 import authRoutes from './routes/authRoutes';
 import dataRoutes from './routes/data';
 import topicsRoutes from './routes/topics';
+import literatureRoutes from './routes/literature';
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/topics', topicsRoutes);
+app.use('/api/literature', literatureRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
