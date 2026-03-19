@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -9,127 +10,128 @@ import AiAssistant from '../chat/AiAssistant';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
+import * as authService from '@/services/authService';
 
-const levels = Array.from({ length: 8 }, (_, index) => index + 1);
+const levels = Array.from({ length: 7 }, (_, index) => index + 1);
+
+const UNLOCK_DEPS: Record<number, number[]> = {
+  1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
+};
 
 export default function Layout() {
-  const navigate = useNavigate();
-  const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+  const logout = useAuthStore((s) => s.logout);
   const completedStages = user?.completedStages ?? [];
 
-  const UNLOCK_DEPS: Record<number, number[]> = {
-    1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6], 8: [7],
-  };
   function isUnlockedFn(level: number) {
     return UNLOCK_DEPS[level]?.every((d) => completedStages.includes(d)) ?? false;
   }
 
   const firstActive = levels.find((l) => isUnlockedFn(l) && !completedStages.includes(l)) ?? 1;
+
   const [activeLevel, setActiveLevel] = useState(firstActive);
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const [levelLoading, setLevelLoading] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
-  const dragState = useRef({
-    isDragging: false,
-    startX: 0,
-    scrollLeft: 0,
-  });
+  const levelUpTimeoutRef = useRef<number | null>(null);
+  const dragState = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const target = event.target as HTMLElement;
-
-    if (target.closest('button')) {
-      return;
-    }
-
-    dragState.current = {
-      isDragging: true,
-      startX: event.clientX,
-      scrollLeft: container.scrollLeft,
-    };
-
+    if (!container) return;
+    if ((event.target as HTMLElement).closest('button')) return;
+    dragState.current = { isDragging: true, startX: event.clientX, scrollLeft: container.scrollLeft };
     container.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container || !dragState.current.isDragging) {
-      return;
-    }
-
-    const deltaX = event.clientX - dragState.current.startX;
-    container.scrollLeft = dragState.current.scrollLeft - deltaX;
+    if (!container || !dragState.current.isDragging) return;
+    container.scrollLeft = dragState.current.scrollLeft - (event.clientX - dragState.current.startX);
   };
 
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    if (container.scrollWidth <= container.clientWidth) {
-      return;
-    }
-
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY;
-
-    if (delta === 0) {
-      return;
-    }
-
+    if (!container || container.scrollWidth <= container.clientWidth) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (delta === 0) return;
     event.preventDefault();
     container.scrollLeft += delta;
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const container = roadmapRef.current;
-
     dragState.current.isDragging = false;
+    roadmapRef.current?.releasePointerCapture(event.pointerId);
+  };
 
-    if (container?.hasPointerCapture(event.pointerId)) {
-      container.releasePointerCapture(event.pointerId);
+  useEffect(() => {
+    return () => {
+      if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return;
+    let isMounted = true;
+    authService.getStreakSummary()
+      .then((summary) => { if (isMounted) setDailyStreak(summary.currentStreak); })
+      .catch(() => { if (isMounted) setDailyStreak(0); });
+    return () => { isMounted = false; };
+  }, []);
+
+  const updateLevel = async (action: 'reset' | 'progress') => {
+    if (levelLoading) return;
+    setLevelLoading(true);
+    try {
+      const response = action === 'reset' ? await authService.resetLevel() : await authService.progressLevel();
+      const previousLevel = user?.currentLevel ?? 1;
+      const newLevel = response.user.current_level;
+      setUser({ ...user!, currentLevel: newLevel });
+      setActiveLevel(newLevel);
+      if (action === 'progress' && newLevel > previousLevel) {
+        setShowLevelUp(true);
+        if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+        levelUpTimeoutRef.current = window.setTimeout(() => {
+          setShowLevelUp(false);
+          levelUpTimeoutRef.current = null;
+        }, 500);
+      }
+    } finally {
+      setLevelLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
+      {showLevelUp && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-yellow-300/85">
+          <span className="text-5xl font-bold uppercase tracking-[0.3em] text-neutral-950">Level up</span>
+        </div>
+      )}
+
       <header className="flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
-        <img
-          src={studyonLogo}
-          alt="Studyon logo"
-          className="h-14 w-14 object-contain brightness-0 invert"
-        />
+        <img src={studyonLogo} alt="Studyon logo" className="h-14 w-14 object-contain brightness-0 invert" />
+        <button
+          type="button"
+          onClick={() => navigate('/streak')}
+          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
+        >
+          <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
+          <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
+        </button>
         <div className="ml-auto">
           <button
             type="button"
             onClick={() => { logout(); navigate('/login'); }}
             className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
-            aria-label="Logout"
           >
             <span className="text-sm font-medium">Logout</span>
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/streak')}
-          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
-          aria-label="Open streak page"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-current">
-            <path d="M13.09 2.91c.42 2.37-.54 3.98-1.47 5.53-.86 1.44-1.68 2.8-1.24 4.72.2.85.71 1.67 1.44 2.31-.13-1.7.61-2.9 1.37-4.11.92-1.46 1.87-2.98 1.5-5.28 2.52 1.77 4.31 4.75 4.31 7.92A7 7 0 1 1 7 11.9c.25-1.73 1.2-3.3 2.58-4.37-.27 2.03.34 3.27 1.04 4.18.06-1.92 1-3.48 1.9-4.98.98-1.63 1.91-3.18 1.57-5.82Z" />
-          </svg>
-          <span className="text-xl font-semibold text-orange-400">1</span>
-        </button>
       </header>
 
       <main className="flex min-h-[90vh]">
@@ -149,11 +151,8 @@ export default function Layout() {
                 <div className="absolute left-6 right-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-200" />
                 <div
                   className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
-                  style={{
-                    width: `calc(${((firstActive - 1) / (levels.length - 1)) * 100}% - 3rem)`,
-                  }}
+                  style={{ width: `calc((100% - 3rem) * ${Math.max(0, (firstActive - 1) / (levels.length - 1))})` }}
                 />
-
                 <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
@@ -200,10 +199,32 @@ export default function Layout() {
           </div>
 
           <div className="flex-1 bg-white px-8 py-8">
-            <div className="flex h-full min-h-[320px] items-center justify-center rounded-[2.5rem] bg-neutral-200/70">
-              <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">
-                {activeLevel}
-              </p>
+            <div className="flex h-full min-h-[320px] flex-col rounded-[2.5rem] bg-neutral-200/70 px-8 py-8">
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateLevel('reset')}
+                  disabled={levelLoading}
+                  className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Reset Level
+                </button>
+                {activeLevel !== 7 && (
+                  <button
+                    type="button"
+                    onClick={() => updateLevel('progress')}
+                    disabled={levelLoading}
+                    className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Progress Level
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-1 items-center justify-center">
+                <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">
+                  {activeLevel}
+                </p>
+              </div>
             </div>
             <Outlet />
           </div>
@@ -213,28 +234,24 @@ export default function Layout() {
           {!assistantOpen && (
             <button
               onClick={() => setAssistantOpen(true)}
-              className="absolute -left-5 top-1/2 z-10 flex h-16 w-5 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-neutral-200 bg-white text-neutral-400 shadow-md hover:text-neutral-700"
+              className="absolute -left-12 top-1/2 z-10 -translate-y-1/2 overflow-hidden rounded-full shadow-lg transition hover:shadow-xl"
               aria-label="Open AI Assistant"
             >
-              {'<'}
+              <img src={badgerImage} alt="Badger" className="h-20 w-20 object-cover" />
             </button>
           )}
           {assistantOpen && (
-            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-6 py-8 text-neutral-900 lg:w-[380px]">
+            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-3 pl-4 py-8 text-neutral-900 lg:w-[380px]">
               <div className="relative flex justify-center">
-                <div className="flex justify-center">
-                  <img
-                    src={badgerImage}
-                    alt="Badger"
-                    className="h-24 w-24 rounded-full object-cover"
-                  />
-                </div>
+                <img src={badgerImage} alt="Badger" className="h-24 w-24 rounded-full object-cover" />
                 <button
                   onClick={() => setAssistantOpen(false)}
-                  className="absolute right-0 top-0 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                  className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                   aria-label="Close AI Assistant"
                 >
-                  x
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
+                    <path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+                  </svg>
                 </button>
               </div>
               <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">

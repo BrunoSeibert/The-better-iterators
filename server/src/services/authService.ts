@@ -2,6 +2,23 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { db } from '../config/db';
 
+function getLocalDateKey(date = new Date()) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+export async function touchDailyLogin(userId: string) {
+  await db.query(
+    `INSERT INTO "UserDailyLogin" (id, user_id, login_date)
+     VALUES (gen_random_uuid()::TEXT, $1, $2::date)
+     ON CONFLICT (user_id, login_date) DO NOTHING`,
+    [userId, getLocalDateKey()]
+  );
+}
+
 function signToken(user: { id: string; name: string; email: string; is_onboarded: boolean; current_level: number }) {
   return jwt.sign(
     { userId: user.id, user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level } },
@@ -16,10 +33,13 @@ export async function register(name: string, email: string, password: string) {
 
   const hashed = await bcrypt.hash(password, 10);
   const result = await db.query(
-    'INSERT INTO "User" (id, name, email, password) VALUES (gen_random_uuid()::TEXT, $1, $2, $3) RETURNING id, name, email, is_onboarded, current_level',
-    [name, email, hashed]
+    `INSERT INTO "User" (id, name, email, password, current_level, first_login_date)
+     VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 1, $4::date)
+     RETURNING id, name, email, is_onboarded, current_level, first_login_date`,
+    [name, email, hashed, getLocalDateKey()]
   );
   const user = result.rows[0];
+  await touchDailyLogin(user.id);
   const token = signToken(user);
   return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level }, token };
 }
@@ -32,6 +52,7 @@ export async function login(email: string, password: string) {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new Error('Invalid credentials');
 
+  await touchDailyLogin(user.id);
   const token = signToken(user);
   return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level }, token };
 }
@@ -52,4 +73,89 @@ export async function completeOnboarding(
      WHERE id = $7`,
     [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
   );
+}
+
+export async function getUserById(userId: string) {
+  const result = await db.query(
+    'SELECT id, name, email, current_level, first_login_date FROM "User" WHERE id = $1',
+    [userId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function resetLevel(userId: string) {
+  const result = await db.query(
+    'UPDATE "User" SET current_level = 1 WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
+    [userId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function progressLevel(userId: string) {
+  const result = await db.query(
+    'UPDATE "User" SET current_level = LEAST(COALESCE(current_level, 1) + 1, 7) WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
+    [userId]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getStreakSummary(userId: string) {
+  const userResult = await db.query(
+    'SELECT first_login_date FROM "User" WHERE id = $1',
+    [userId]
+  );
+  const user = userResult.rows[0];
+
+  if (!user) return null;
+
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+  const nextMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1));
+  const todayKey = getLocalDateKey(now);
+  const yesterday = new Date(`${todayKey}T00:00:00.000Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+  const activeDaysResult = await db.query(
+    `SELECT TO_CHAR(login_date, 'YYYY-MM-DD') AS login_date
+     FROM "UserDailyLogin"
+     WHERE user_id = $1
+       AND login_date >= $2::date
+       AND login_date < $3::date
+     ORDER BY login_date ASC`,
+    [userId, monthStart.toISOString().slice(0, 10), nextMonthStart.toISOString().slice(0, 10)]
+  );
+
+  const allDaysResult = await db.query(
+    `SELECT TO_CHAR(login_date, 'YYYY-MM-DD') AS login_date
+     FROM "UserDailyLogin"
+     WHERE user_id = $1
+     ORDER BY login_date DESC`,
+    [userId]
+  );
+
+  const allLoginKeys = allDaysResult.rows.map((row) => row.login_date as string);
+  const loginDaySet = new Set(allLoginKeys);
+  const latestLoginKey = allLoginKeys[0] ?? null;
+
+  let currentStreak = 0;
+  const streakDates: string[] = [];
+
+  if (latestLoginKey === todayKey || latestLoginKey === yesterdayKey) {
+    const cursor = new Date(`${latestLoginKey}T00:00:00.000Z`);
+    while (loginDaySet.has(cursor.toISOString().slice(0, 10))) {
+      streakDates.push(cursor.toISOString().slice(0, 10));
+      currentStreak += 1;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+  }
+
+  return {
+    firstLoginDate: user.first_login_date,
+    currentStreak,
+    activeDates: activeDaysResult.rows.map((row) => row.login_date as string),
+    streakDates,
+    month: monthStart.getUTCMonth() + 1,
+    year: monthStart.getUTCFullYear(),
+  };
 }

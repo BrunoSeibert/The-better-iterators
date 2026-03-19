@@ -1,0 +1,72 @@
+[
+  {
+    "id": "uni-01",
+    "name": "ETH Zurich",
+    "country": "CH",
+    "domains": ["ethz.ch"],
+    "about": "ETH Zurich is one of the world's leading universities for technology and natural sciences. Known for cutting-edge research in engineering, computer science, and physics, it consistently ranks among the top 10 globally. ETH fosters strong industry partnerships and has produced 22 Nobel Prize laureates."
+  },
+  {
+    "id": "uni-02",
+    "name": "EPFL",
+    "country": "CH",
+    "domains": ["epfl.ch"],
+    "about": "EPFL is a research-intensive university specializing in engineering and life sciences, located on the shores of Lake Geneva. It hosts over 350 labs and research groups and is known for its entrepreneurial culture, with a thriving startup ecosystem through the EPFL Innovation Park."
+  },
+  {
+    "id": "uni-03",
+    "name": "University of St. Gallen (HSG)",
+    "country": "CH",
+    "domains": ["unisg.ch"],
+    "about": "HSG is one of Europe's leading business universities, consistently ranked among the top for management, finance, and economics. With a strong practical orientation and close ties to the Swiss and international business community, HSG graduates are highly sought after by consulting, banking, and tech companies."
+  },
+  {
+    "id": "uni-04",
+    "name": "University of Zurich",
+    "country": "CH",
+    "domains": ["uzh.ch"],
+    "about": "The University of Zurich is Switzerland's largest university, offering the widest range of programs in the country. It is particularly strong in medicine, economics, psychology, and informatics. UZH is a member of the League of European Research Universities and has close ties to ETH Zurich."
+  },
+  {
+    "id": "uni-05",
+    "name": "University of Bern",
+    "country": "CH",
+    "domains": ["unibe.ch"],
+    "about": "The University of Bern is a comprehensive research university with particular strengths in climate science, space research, and biomedical sciences. It plays a central role in Switzerland's national research initiatives and benefits from its location in the Swiss capital."
+  },
+  {
+    "id": "uni-06",
+    "name": "University of Basel",
+    "country": "CH",
+    "domains": ["unibas.ch"],
+    "about": "The University of Basel is Switzerland's oldest university, founded in 1460. Located in the heart of the Swiss pharma and life sciences cluster, it has deep connections to Roche, Novartis, and other industry leaders. Strong in molecular biology, pharmaceutical sciences, and digital humanities."
+  },
+  {
+    "id": "uni-07",
+    "name": "ZHAW",
+    "country": "CH",
+    "domains": ["zhaw.ch"],
+    "about": "ZHAW is one of Switzerland's largest universities of applied sciences, with a strong focus on practice-oriented education and applied research. Programs span engineering, business, linguistics, health sciences, and social work, with mandatory industry internships and close ties to regional employers."
+  },
+  {
+    "id": "uni-08",
+    "name": "FHNW",
+    "country": "CH",
+    "domains": ["fhnw.ch"],
+    "about": null
+  },
+  {
+    "id": "uni-09",
+    "name": "OST – Eastern Switzerland University of Applied Sciences",
+    "country": "CH",
+    "domains": ["ost.ch"],
+    "about": null
+  },
+  {
+    "id": "uni-10",
+    "name": "USI – Università della Svizzera italiana",
+    "country": "CH",
+    "domains": ["usi.ch"],
+    "about": null
+  }
+]
