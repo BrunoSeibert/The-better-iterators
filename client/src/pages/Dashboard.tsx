@@ -63,13 +63,6 @@ export default function Dashboard() {
   const [deadlineInput, setDeadlineInput] = useState('');
   const streak = peekStreakSummary()?.currentStreak ?? 0;
 
-  const [checkinDone, setCheckinDone] = useState(() => {
-    try {
-      const raw = localStorage.getItem('todayCheckin');
-      if (!raw) return false;
-      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
-    } catch { return false; }
-  });
   const [checkinOpen, setCheckinOpen] = useState(false);
 
   useEffect(() => {
@@ -169,17 +162,6 @@ export default function Dashboard() {
         </div>
         <div className="ml-auto flex items-center gap-3">
           <button
-            onClick={() => !checkinDone && setCheckinOpen(true)}
-            disabled={checkinDone}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-            style={checkinDone
-              ? { backgroundColor: 'rgba(152,195,121,0.25)', color: 'rgba(180,220,140,1)', border: '1px solid rgba(152,195,121,0.4)', cursor: 'default' }
-              : { backgroundColor: C.lightTan, color: C.darkBrown, border: `1px solid ${C.tan}` }
-            }
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
-          <button
             onClick={() => navigate('/profile', { state: { returnTo: '/dashboard' } })}
             className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition"
             style={{ color: C.tan, border: `1px solid rgba(120,90,68,1)` }}
@@ -200,7 +182,7 @@ export default function Dashboard() {
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.mutedText }}>Daily check-in</p>
               <button onClick={() => setCheckinOpen(false)} style={{ fontSize: 16, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
             </div>
-            <DailyCheckin onComplete={() => { setCheckinDone(true); setCheckinOpen(false); }} />
+            <DailyCheckin onComplete={() => {}} />
           </div>
         </div>
       )}
