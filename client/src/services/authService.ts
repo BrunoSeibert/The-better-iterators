@@ -61,6 +61,38 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+export async function getTopicsFromOtherUniversities() {
+  const res = await api.get('/topics/by-university?other=true');
+  return res.data as {
+    topics: {
+      id: string;
+      title: string;
+      description: string;
+      employment: string;
+      employmentType: string | null;
+      workplaceType: string | null;
+      degrees: string[];
+      companyId: string;
+    }[];
+  };
+}
+
+export async function getAllTopics() {
+  const res = await api.get('/topics/by-university?all=true&global=true');
+  return res.data as {
+    topics: {
+      id: string;
+      title: string;
+      description: string;
+      employment: string;
+      employmentType: string | null;
+      workplaceType: string | null;
+      degrees: string[];
+      companyId: string;
+    }[];
+  };
+}
+
 export async function getTopicsByUniversity(all = false) {
   const res = await api.get(all ? '/topics/by-university?all=true' : '/topics/by-university');
   return res.data as {
@@ -74,6 +106,32 @@ export async function getTopicsByUniversity(all = false) {
       degrees: string[];
       companyId: string;
     }[];
+  };
+}
+
+export async function getTopicById(id: string) {
+  const res = await api.get(`/topics/${id}`);
+  return res.data as {
+    topic: {
+      id: string;
+      title: string;
+      description: string;
+      type: string;
+      employment: string;
+      employmentType: string | null;
+      workplaceType: string | null;
+      degrees: string[];
+      fieldIds: string[];
+      companyId: string;
+      universityId: string | null;
+      supervisorIds: string[];
+      expertIds: string[];
+    };
+    company: { id: string; name: string; description: string; about: string; size: string; domains: string[] } | null;
+    university: { id: string; name: string; country: string; about: string } | null;
+    fields: { id: string; name: string }[];
+    supervisors: { id: string; firstName: string; lastName: string; title: string; email: string; about: string; researchInterests: string[] }[];
+    experts: { id: string; firstName: string; lastName: string; title: string; email: string; about: string }[];
   };
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as authService from '@/services/authService';
 
 type Topic = {
@@ -13,12 +14,14 @@ type Topic = {
 };
 
 function TopicGrid({ topics }: { topics: Topic[] }) {
+  const navigate = useNavigate();
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {topics.map((topic) => (
         <div
           key={topic.id}
-          className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"
+          onClick={() => navigate(`/topics/${topic.id}`)}
+          className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-neutral-300 hover:shadow-md"
         >
           <h3 className="text-base font-semibold leading-snug text-neutral-900">
             {topic.title}
@@ -47,11 +50,11 @@ function TopicGrid({ topics }: { topics: Topic[] }) {
   );
 }
 
-export default function Level2() {
+export default function Level1() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
-  const [browsingAll, setBrowsingAll] = useState(false);
-  const [loadingAll, setLoadingAll] = useState(false);
+  const [browsingOther, setBrowsingOther] = useState(false);
+  const [loadingOther, setLoadingOther] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,16 +80,16 @@ export default function Level2() {
     };
   }, []);
 
-  const browseAll = () => {
-    setLoadingAll(true);
+  const browseOtherUniversities = () => {
+    setLoadingOther(true);
     authService
-      .getTopicsByUniversity(true)
+      .getTopicsFromOtherUniversities()
       .then(({ topics }) => {
         setTopics(topics);
-        setBrowsingAll(true);
-        setLoadingAll(false);
+        setBrowsingOther(true);
+        setLoadingOther(false);
       })
-      .catch(() => setLoadingAll(false));
+      .catch(() => setLoadingOther(false));
   };
 
   if (loading) {
@@ -105,19 +108,29 @@ export default function Level2() {
     );
   }
 
-  if (topics.length === 0 && !browsingAll) {
+  if (topics.length === 0 && browsingOther) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-neutral-600">
+          No topics matching your interests were found at other universities either.
+        </p>
+      </div>
+    );
+  }
+
+  if (topics.length === 0 && !browsingOther) {
+    return (
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 text-center">
         <p className="text-neutral-600">
           At your university there are no available topics matching your interests.
         </p>
         <button
           type="button"
-          onClick={browseAll}
-          disabled={loadingAll}
+          onClick={browseOtherUniversities}
+          disabled={loadingOther}
           className="rounded-full bg-neutral-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-60"
         >
-          {loadingAll ? 'Loading…' : 'Browse all topics from your university'}
+          {loadingOther ? 'Loading…' : 'Browse same interests in other universities'}
         </button>
       </div>
     );
@@ -125,9 +138,9 @@ export default function Level2() {
 
   return (
     <div className="flex flex-col gap-4">
-      {browsingAll && (
+      {browsingOther && (
         <p className="text-sm text-neutral-400">
-          Showing all topics from your university
+          Showing topics matching your interests from other universities
         </p>
       )}
       <TopicGrid topics={topics} />
