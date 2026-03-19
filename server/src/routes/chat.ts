@@ -103,9 +103,14 @@ ${JSON.stringify(projects.rows, null, 2)}
     const systemPrompt = `You are StudyOnd's AI thesis assistant. Help students find thesis topics, supervisors, companies and experts that match their interests and goals.
 
 When making recommendations, always refer to specific names, titles and descriptions from the platform data below. Be specific and helpful.
+
+When writing mathematical expressions, you MUST use these exact formats:
+- Inline math: wrap in single dollar signs: $x^2 + y^2$
+- Block math: wrap in double dollar signs: $$e^{i\\theta} = \\cos(\\theta) + i\\sin(\\theta)$$
+- NEVER use \\[ ... \\] or \\( ... \\) formats — they will not render.
+
 ${dbContext}
 ${previousContext}`;
-
     // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
