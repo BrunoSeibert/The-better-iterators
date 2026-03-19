@@ -347,14 +347,18 @@ export default function Layout() {
           {!assistantOpen && (
             <button
               onClick={() => setAssistantOpen(true)}
-              className="absolute -left-5 top-1/2 z-10 flex h-16 w-5 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-neutral-200 bg-white text-neutral-400 shadow-md hover:text-neutral-700"
+              className="absolute -left-12 top-1/2 z-10 -translate-y-1/2 overflow-hidden rounded-full shadow-lg hover:shadow-xl transition"
               aria-label="Open AI Assistant"
             >
-              {'<'}
+              <img
+                src={badgerImage}
+                alt="Badger"
+                className="h-20 w-20 object-cover"
+              />
             </button>
           )}
           {assistantOpen && (
-            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-6 py-8 text-neutral-900 lg:w-[380px]">
+            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-3 pl-4 py-8 text-neutral-900 lg:w-[380px]">
               <div className="relative flex justify-center">
                 <div className="flex justify-center">
                   <img
@@ -365,7 +369,7 @@ export default function Layout() {
                 </div>
                 <button
                   onClick={() => setAssistantOpen(false)}
-                  className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 shadow-sm transition hover:bg-neutral-200 hover:text-neutral-800"
+                  className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                   aria-label="Close AI Assistant"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
