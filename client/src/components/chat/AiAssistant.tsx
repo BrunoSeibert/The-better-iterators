@@ -7,8 +7,8 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { getLevelMetadata } from '@/services/authService';
 
-const IDLE_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_AFFIRMATIONS_PER_SESSION = 2;
+const IDLE_MS = 5 * 60 * 1000;
+const AFFIRMATION_CHECK_MS = 1000;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -26,7 +26,11 @@ export default function AiAssistant() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastUserMessageAt = useRef<number>(Date.now());
-  const affirmationCount = useRef(0);
+  const loadingRef = useRef(false);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,9 +53,18 @@ export default function AiAssistant() {
     } catch { return undefined; }
   };
 
+  const playAffirmation = useCallback((content: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(content);
+    utterance.rate = 1;
+    utterance.pitch = 1.02;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
   const fetchAffirmation = useCallback(async () => {
-    if (loading || affirmationCount.current >= MAX_AFFIRMATIONS_PER_SESSION) return;
-    affirmationCount.current += 1;
+    if (loadingRef.current || !token) return;
 
     try {
       const checkinContext = getCheckinContext();
@@ -64,20 +77,27 @@ export default function AiAssistant() {
       const data = await res.json();
       if (data.content) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.content, isAffirmation: true }]);
+        playAffirmation(data.content);
       }
     } catch { /* silently skip */ }
-  }, [loading, token]);
+  }, [playAffirmation, token]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       const idleMs = Date.now() - lastUserMessageAt.current;
       if (idleMs >= IDLE_MS) {
-        fetchAffirmation();
+        void fetchAffirmation();
         lastUserMessageAt.current = Date.now();
       }
-    }, 60_000);
-    return () => clearInterval(interval);
+    }, AFFIRMATION_CHECK_MS);
+    return () => window.clearInterval(interval);
   }, [fetchAffirmation]);
+
+  useEffect(() => () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
 
   async function sendMessage() {
     const text = input.trim();
