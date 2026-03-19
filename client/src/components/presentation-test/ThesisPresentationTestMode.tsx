@@ -458,34 +458,36 @@ export default function ThesisPresentationTestMode() {
 
   if (sessionState === 'idle') {
     return (
-      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md bg-neutral-100 px-8 py-10 text-neutral-900">
-        <div className="relative flex h-full flex-col items-center justify-between">
+      <div className="flex h-full w-full flex-col overflow-y-auto rounded-md bg-neutral-100 text-neutral-900">
+        <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 px-6 py-8 sm:py-12">
           <div className="text-center">
-            <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-neutral-900">
+            <h2 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
               Practice a timed mock thesis defense.
             </h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-600">
+            <p className="mt-3 text-sm leading-6 text-neutral-600">
               One new examiner question appears every minute. Your spoken answers are captured and evaluated at the end.
             </p>
           </div>
 
-          <div className="relative mt-2 flex w-full max-w-4xl flex-1 items-center justify-center">
-            <div className="absolute inset-x-24 bottom-12 h-12 rounded-full bg-[radial-gradient(circle,rgba(81,60,45,0.16),transparent_70%)] blur-2xl" />
+          <div className="relative flex w-full max-w-sm items-center justify-center py-2">
+            <div className="absolute inset-x-12 bottom-2 h-8 rounded-full bg-[radial-gradient(circle,rgba(81,60,45,0.16),transparent_70%)] blur-2xl" />
             <img
               src={mascotCouchImage}
               alt="Mascot sitting on a couch ready to listen"
-              className="relative z-10 -mt-[10px] max-h-[12.75rem] w-auto object-contain"
+              className="relative z-10 w-auto object-contain"
+              style={{ maxHeight: 'clamp(8rem, 20vh, 12.75rem)' }}
             />
           </div>
 
-          <div className="mt-4 flex w-full max-w-2xl flex-col gap-4 rounded-2xl border border-neutral-200 bg-white/90 px-5 py-5 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-2">
+          <div className="w-full flex-col gap-4 rounded-2xl px-5 py-5" style={{ backgroundColor: 'rgba(250,250,250,1)', border: '2px solid rgba(212,212,216,1)' }}>
+            <div className="grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-left">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Session duration</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(113,113,122,1)' }}>Session duration</span>
                 <select
                   value={selectedDurationMinutes}
                   onChange={(event) => setSelectedDurationMinutes(Number(event.target.value))}
-                  className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                  className="focus:outline-none"
+                  style={{ backgroundColor: 'rgba(244,244,245,1)', border: '2px solid rgba(212,212,216,1)', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: 'rgba(38,38,38,1)', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23737373' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
                 >
                   {DURATION_OPTIONS_MINUTES.map((durationMinutes) => (
                     <option key={durationMinutes} value={durationMinutes}>
@@ -496,11 +498,12 @@ export default function ThesisPresentationTestMode() {
               </label>
 
               <label className="flex flex-col gap-2 text-left">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Question interval</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(113,113,122,1)' }}>Question interval</span>
                 <select
                   value={selectedIntervalSeconds}
                   onChange={(event) => setSelectedIntervalSeconds(Number(event.target.value))}
-                  className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                  className="focus:outline-none"
+                  style={{ backgroundColor: 'rgba(244,244,245,1)', border: '2px solid rgba(212,212,216,1)', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: 'rgba(38,38,38,1)', cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23737373' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
                 >
                   {INTERVAL_OPTIONS_SECONDS.map((intervalSeconds) => (
                     <option key={intervalSeconds} value={intervalSeconds}>
@@ -515,12 +518,12 @@ export default function ThesisPresentationTestMode() {
           <button
             type="button"
             onClick={() => void startSession()}
-            className="mt-6 rounded-md border border-neutral-800 bg-neutral-800 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700"
+            className="w-full rounded-md border border-neutral-800 bg-neutral-800 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700 sm:w-auto"
           >
             Start Test Session
           </button>
           {error && (
-            <div className="mt-6 max-w-xl rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="w-full rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -563,12 +566,12 @@ export default function ThesisPresentationTestMode() {
           </div>
         </div>
 
-        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center py-6">
-          <div className="w-full max-w-5xl rounded-[0.6rem] border border-neutral-200 bg-white px-10 py-10 text-center shadow-sm">
-            <h2 className="text-3xl font-semibold leading-tight tracking-tight text-neutral-900">
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center py-4">
+          <div className="w-full rounded-[0.6rem] border border-neutral-200 bg-white px-5 py-6 text-center shadow-sm sm:px-10 sm:py-10">
+            <h2 className="text-xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-3xl">
               {currentQuestion}
             </h2>
-            <p className="mt-5 max-w-2xl mx-auto text-center text-sm leading-6 text-neutral-500">
+            <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-6 text-neutral-500">
               Speak your answer naturally as if you were defending your thesis to an examiner.
             </p>
           </div>

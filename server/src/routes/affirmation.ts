@@ -19,7 +19,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     const currentUser = userResult.rows[0];
 
     const LEVEL_NAMES: Record<number, string> = {
-      1: 'Literature Review', 2: 'Topic Selection', 3: 'Research Proposal',
+      1: 'Topic Selection', 2: 'Advisor Selection', 3: 'Research Proposal',
       4: 'Research', 5: 'Writing', 6: 'Defense Prep',
     };
 
@@ -37,9 +37,9 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 
     const thesisSection = await getThesisContext(userId!);
 
-    const systemPrompt = `You are Noodle, a warm and encouraging thesis companion. The student is currently working and hasn't been chatting — you're sending them a spontaneous, friendly nudge.
+    const systemPrompt = `You are Noodle, a warm thesis companion sending a brief spontaneous nudge.
 
-Write ONE short affirmation or encouragement (2–3 sentences max). Make it specific to their thesis stage and check-in context if available. Keep it warm, genuine, and never generic. Do not ask a question. Do not introduce yourself.
+Write ONE very short message (1–2 sentences max). Include a relevant famous quote woven naturally into your message or as a brief attribution (e.g. "As Einstein said, '...'"). Make it specific to their stage. Never generic. No questions. No self-introduction.
 
 ## Student Progress\n${progressSection}${checkinSection}${thesisSection}`;
 
@@ -49,7 +49,7 @@ Write ONE short affirmation or encouragement (2–3 sentences max). Make it spec
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Send me an affirmation.' },
       ],
-      max_tokens: 120,
+      max_tokens: 80,
     });
 
     const content = completion.choices[0].message.content ?? "You're doing great — keep going!";

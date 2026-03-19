@@ -9,11 +9,20 @@ import { getLevelMetadata } from '@/services/authService';
 
 const IDLE_MS = 5 * 60 * 1000;
 const AFFIRMATION_CHECK_MS = 1000;
+const PASTEL_COLORS = [
+  { bg: 'rgba(255,223,211,0.6)', border: 'rgba(255,180,150,0.8)', text: 'rgba(160,80,40,1)' },
+  { bg: 'rgba(211,235,255,0.6)', border: 'rgba(150,200,255,0.8)', text: 'rgba(40,90,160,1)' },
+  { bg: 'rgba(220,255,220,0.6)', border: 'rgba(150,220,150,0.8)', text: 'rgba(40,130,60,1)' },
+  { bg: 'rgba(255,220,255,0.6)', border: 'rgba(210,150,210,0.8)', text: 'rgba(130,40,130,1)' },
+  { bg: 'rgba(255,255,200,0.6)', border: 'rgba(220,210,100,0.8)', text: 'rgba(120,100,20,1)' },
+  { bg: 'rgba(220,245,255,0.6)', border: 'rgba(130,210,240,0.8)', text: 'rgba(20,100,140,1)' },
+];
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   isAffirmation?: boolean;
+  pastelIndex?: number;
 }
 
 export default function AiAssistant() {
@@ -76,7 +85,8 @@ export default function AiAssistant() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.content) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.content, isAffirmation: true }]);
+        const pastelIndex = Math.floor(Math.random() * PASTEL_COLORS.length);
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.content, isAffirmation: true, pastelIndex }]);
         playAffirmation(data.content);
       }
     } catch { /* silently skip */ }
@@ -157,12 +167,16 @@ export default function AiAssistant() {
                 msg.role === 'user'
                   ? 'bg-[rgba(114,96,84,1)] text-[rgba(245,239,231,1)]'
                   : msg.isAffirmation
-                    ? 'border border-amber-200 bg-amber-50 text-neutral-700'
+                    ? ''
                     : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
               }`}
+              style={msg.isAffirmation ? (() => {
+                const p = PASTEL_COLORS[msg.pastelIndex ?? 0];
+                return { backgroundColor: p.bg, border: `1px solid ${p.border}`, color: p.text };
+              })() : undefined}
             >
               {msg.isAffirmation && (
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-500">✦ Noodle</p>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'inherit', opacity: 0.6 }}>✦ Noodle</p>
               )}
               {msg.role === 'user' ? (
                 msg.content
