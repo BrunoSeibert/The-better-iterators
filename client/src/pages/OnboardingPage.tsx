@@ -16,13 +16,13 @@ const DEGREE_OPTIONS = [
 ];
 
 const THESIS_STAGES = [
-  { label: "I'm still looking for a topic", level: 1 },
-  { label: "I have a topic, no literature review yet", level: 2 },
-  { label: "I've done literature research, no proposal yet", level: 3 },
-  { label: "I'm writing my research proposal", level: 4 },
-  { label: "I'm doing my actual research", level: 5 },
-  { label: "I'm writing my thesis", level: 6 },
-  { label: "I'm preparing for my defense", level: 7 },
+  { label: "I'm still looking for a topic",             getCompleted: (a: boolean) => a ? [2] : [] },
+  { label: "I have a topic, no literature review yet",  getCompleted: (a: boolean) => a ? [1, 2] : [1] },
+  { label: "I've done literature research, no proposal yet", getCompleted: (a: boolean) => a ? [1, 2, 3] : [1, 3] },
+  { label: "I'm writing my research proposal",          getCompleted: () => [1, 2, 3] },
+  { label: "I'm doing my actual research",              getCompleted: () => [1, 2, 3, 4] },
+  { label: "I'm writing my thesis",                     getCompleted: () => [1, 2, 3, 4, 5] },
+  { label: "I'm preparing for my defense",              getCompleted: () => [1, 2, 3, 4, 5, 6] },
 ];
 
 type Step = 'info' | 'interests' | 'advisor' | 'stage';
@@ -78,11 +78,12 @@ export default function OnboardingPage() {
     if (prev) setStep(prev);
   }
 
-  async function handleStageSelect(level: number) {
+  async function handleStageSelect(completedStages: number[]) {
+    const currentLevel = completedStages.length > 0 ? Math.max(...completedStages) : 0;
     setLoading(true);
     try {
-      await authService.completeOnboarding({ level, universityId, studyProgramId, degreeType, fieldIds });
-      setAuth({ ...user!, isOnboarded: true, currentLevel: level }, token!);
+      await authService.completeOnboarding({ currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds });
+      setAuth({ ...user!, isOnboarded: true, currentLevel, completedStages }, token!);
       navigate('/app');
     } catch {
       setError('Something went wrong. Please try again.');
@@ -273,10 +274,10 @@ export default function OnboardingPage() {
               {hasAdvisor ? 'Great! Where are you in your thesis journey?' : 'Where are you in your thesis journey?'}
             </h1>
             <div className="w-full space-y-3">
-              {THESIS_STAGES.map((s) => (
+              {THESIS_STAGES.map((s, i) => (
                 <button
-                  key={s.level}
-                  onClick={() => handleStageSelect(s.level)}
+                  key={i}
+                  onClick={() => handleStageSelect(s.getCompleted(hasAdvisor ?? false))}
                   disabled={loading}
                   className="w-full border rounded-2xl px-5 py-4 ds-body text-left transition hover:opacity-80 disabled:opacity-40"
                   style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}

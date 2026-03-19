@@ -6,6 +6,7 @@ interface User {
   email: string;
   isOnboarded: boolean;
   currentLevel: number;
+  completedStages: number[];
 }
 
 interface AuthState {
@@ -20,7 +21,9 @@ function getUserFromToken(token: string | null): User | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) return null;
-    return payload.user ?? null;
+    if (!payload.user) return null;
+    const completedStages = JSON.parse(localStorage.getItem('completedStages') || '[]');
+    return { ...payload.user, completedStages };
   } catch {
     return null;
   }
@@ -33,10 +36,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: storedToken,
   setAuth: (user, token) => {
     localStorage.setItem('token', token);
+    localStorage.setItem('completedStages', JSON.stringify(user.completedStages ?? []));
     set({ user, token });
   },
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('completedStages');
     set({ user: null, token: null });
   },
 }));

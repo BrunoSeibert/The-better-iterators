@@ -11,7 +11,8 @@ export async function login(email: string, password: string) {
 }
 
 export async function completeOnboarding(data: {
-  level: number;
+  currentLevel: number;
+  completedStages: number[];
   universityId: string;
   studyProgramId: string;
   degreeType: string;

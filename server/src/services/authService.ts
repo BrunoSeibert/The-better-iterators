@@ -38,7 +38,8 @@ export async function login(email: string, password: string) {
 
 export async function completeOnboarding(
   userId: string,
-  level: number,
+  currentLevel: number,
+  completedStages: number[],
   universityId: string,
   studyProgramId: string,
   degreeType: string,
@@ -46,9 +47,9 @@ export async function completeOnboarding(
 ) {
   await db.query(
     `UPDATE "User"
-     SET is_onboarded = TRUE, current_level = $1, university_id = $2,
-         study_program_id = $3, degree_type = $4, field_ids = $5
-     WHERE id = $6`,
-    [level, universityId, studyProgramId, degreeType, fieldIds, userId]
+     SET is_onboarded = TRUE, current_level = $1, completed_stages = $2,
+         university_id = $3, study_program_id = $4, degree_type = $5, field_ids = $6
+     WHERE id = $7`,
+    [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
   );
 }

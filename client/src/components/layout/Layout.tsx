@@ -11,13 +11,23 @@ import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 
 const levels = Array.from({ length: 8 }, (_, index) => index + 1);
-const unlockedLevel = 5;
 
 export default function Layout() {
-  const [activeLevel, setActiveLevel] = useState(1);
-  const [assistantOpen, setAssistantOpen] = useState(true);
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+  const completedStages = user?.completedStages ?? [];
+
+  const UNLOCK_DEPS: Record<number, number[]> = {
+    1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6], 8: [7],
+  };
+  function isUnlockedFn(level: number) {
+    return UNLOCK_DEPS[level]?.every((d) => completedStages.includes(d)) ?? false;
+  }
+
+  const firstActive = levels.find((l) => isUnlockedFn(l) && !completedStages.includes(l)) ?? 1;
+  const [activeLevel, setActiveLevel] = useState(firstActive);
+  const [assistantOpen, setAssistantOpen] = useState(true);
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -140,14 +150,15 @@ export default function Layout() {
                 <div
                   className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
                   style={{
-                    width: `calc(${((unlockedLevel - 1) / (levels.length - 1)) * 100}% - 3rem)`,
+                    width: `calc(${((firstActive - 1) / (levels.length - 1)) * 100}% - 3rem)`,
                   }}
                 />
 
                 <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
-                    const isUnlocked = level <= unlockedLevel;
+                    const isUnlocked = isUnlockedFn(level);
+                    const isCompleted = completedStages.includes(level);
 
                     return (
                       <button
@@ -156,27 +167,27 @@ export default function Layout() {
                         onClick={() => isUnlocked && setActiveLevel(level)}
                         disabled={!isUnlocked}
                         className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold shadow-[0_0_0_6px_rgba(245,245,245,0.95)] transition ${
-                          isUnlocked
+                          isCompleted
                             ? isActive
-                              ? 'border-neutral-800 bg-neutral-800 text-white'
-                              : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
-                            : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
+                              ? 'border-green-600 bg-green-600 text-white'
+                              : 'border-green-500 bg-green-50 text-green-600 hover:bg-green-100'
+                            : isUnlocked
+                              ? isActive
+                                ? 'border-neutral-800 bg-neutral-800 text-white'
+                                : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
+                              : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
                         }`}
                         aria-pressed={isActive}
-                        aria-label={
-                          isUnlocked
-                            ? `Show level ${level}`
-                            : `Level ${level} is locked`
-                        }
+                        aria-label={isUnlocked ? `Show level ${level}` : `Level ${level} is locked`}
                       >
-                        {isUnlocked ? (
+                        {isCompleted ? (
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                            <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+                          </svg>
+                        ) : isUnlocked ? (
                           level
                         ) : (
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 24 24"
-                            className="h-4 w-4 fill-current"
-                          >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-current">
                             <path d="M16 10V8a4 4 0 1 0-8 0v2H7v10h10V10h-1Zm-6-2a2 2 0 1 1 4 0v2h-4V8Zm5 10H9v-6h6v6Z" />
                           </svg>
                         )}
