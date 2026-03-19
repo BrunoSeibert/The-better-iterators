@@ -686,23 +686,32 @@ export default function Layout() {
       {checkinOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+          style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }}
           onClick={() => setCheckinOpen(false)}
         >
           <div
-            className="relative w-full mx-4 rounded-2xl p-8 shadow-xl overflow-y-auto"
-            style={{ maxWidth: 600, maxHeight: '90vh', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}
+            className="relative w-full mx-4 overflow-y-auto"
+            style={{
+              maxWidth: 600, maxHeight: '90vh',
+              backgroundColor: 'rgba(252,248,243,1)',
+              border: '1px solid rgba(196,177,160,1)',
+              borderRadius: 14,
+              padding: '2rem',
+              boxShadow: '0 8px 40px rgba(81,60,45,0.18)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setCheckinOpen(false)}
-              className="absolute right-4 top-4 text-sm text-neutral-400 hover:text-neutral-600 transition"
-            >
-              ✕
-            </button>
-            <p className="mb-6 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
-              Daily check-in
-            </p>
+            <div className="flex items-center justify-between mb-6">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(140,115,95,1)' }}>
+                Daily check-in
+              </p>
+              <button
+                onClick={() => setCheckinOpen(false)}
+                style={{ fontSize: 16, color: 'rgba(140,115,95,1)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 4 }}
+              >
+                ✕
+              </button>
+            </div>
             <DailyCheckin onComplete={() => setCheckinDone(true)} />
           </div>
         </div>
