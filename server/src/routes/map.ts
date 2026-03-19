@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ ${JSON.stringify(projects.rows, null, 2)}
   return dbCache;
 }
 
-router.get('/matches', async (req: Request, res: Response) => {
+router.get('/matches', requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthRequest).userId;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -111,18 +112,21 @@ router.get('/matches', async (req: Request, res: Response) => {
     const allItems = [...companies.rows, ...unis.rows];
 
     // Fetch user context + db context
-    const userResult = await db.query('SELECT * FROM "User" WHERE id = $1', [userId]);
+    const [userResult, thesisCtx, dbContext] = await Promise.all([
+      db.query('SELECT * FROM "User" WHERE id = $1', [userId]),
+      getThesisContext(userId),
+      getDbContext(),
+    ]);
     const currentUser = userResult.rows[0];
-    const dbContext = await getDbContext();
 
     // Build system prompt for AI
     const systemPrompt = `
-You are StudyOnd's AI assistant. You will rank a list of universities and companies for a student. 
+You are StudyOnd's AI assistant. You will rank a list of universities and companies for a student.
 The student information is below. Rank each item from 0 (least relevant) to 1 (most relevant) for this student.
 
 ## Current User
 ${JSON.stringify(currentUser, null, 2)}
-
+${thesisCtx}
 ${dbContext}
 
 List items in the following JSON format only, including all IDs:

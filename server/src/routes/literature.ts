@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -38,13 +39,15 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 - Degree: ${user?.degree_type ?? 'not specified'}
 - Research interests: ${fieldNames.length > 0 ? fieldNames.join(', ') : 'not specified'}`;
 
+    const thesisCtx = await getThesisContext(userId);
+
     if (phase === 1) {
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: `You are a thesis research assistant. Based on the student's profile, generate search guidance to kick off their literature review.
+            content: `You are a thesis research assistant. Based on the student's profile, generate search guidance to kick off their literature review.${thesisCtx}
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -107,7 +110,7 @@ Rules:
         messages: [
           {
             role: 'system',
-            content: `You are a thesis research assistant helping analyze academic papers. The student's research interests and degree type are provided — always stay grounded in that domain.
+            content: `You are a thesis research assistant helping analyze academic papers. The student's research interests and degree type are provided — always stay grounded in that domain.${thesisCtx}
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -174,7 +177,7 @@ Rules:
         messages: [
           {
             role: 'system',
-            content: `You are a thesis advisor. Based on the student's literature review so far, pick the best matching thesis topics from the provided list.
+            content: `You are a thesis advisor. Based on the student's literature review so far, pick the best matching thesis topics from the provided list.${thesisCtx}
 
 Respond ONLY with valid JSON in this exact format:
 {

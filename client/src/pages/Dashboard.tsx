@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getDashboard, updateMainDeadline, createTodo, toggleTodo, deleteTodo,
+  getDashboard, updateMainDeadline, createTodo, toggleTodo, deleteTodo, completeLevel,
+  getLevelMetadata, setLevelMetadata,
   type DashboardData, type Todo, type DashboardDeadlines,
 } from '@/services/authService';
 import { useAuthStore } from '@/store/authStore';
 import { peekStreakSummary } from '@/services/authService';
 import DailyCheckin from '@/components/DailyCheckin';
+import CompletionModal from '@/components/CompletionModal';
 import studyonLogo from '@/assets/Study_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 
@@ -66,6 +68,55 @@ export default function Dashboard() {
   const streak = peekStreakSummary()?.currentStreak ?? 0;
 
   const [checkinOpen, setCheckinOpen] = useState(false);
+
+  const [completionModal, setCompletionModal] = useState<{ level: number; value: string } | null>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+  const [levelUpNumber, setLevelUpNumber] = useState<number | null>(null);
+  const [levelUpVisible, setLevelUpVisible] = useState(false);
+  const [levelUpExiting, setLevelUpExiting] = useState(false);
+  const levelUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showLevelUpAnimation = (unlockedLevel: number) => {
+    if (levelUpTimerRef.current) clearTimeout(levelUpTimerRef.current);
+    setLevelUpNumber(unlockedLevel);
+    setLevelUpExiting(false);
+    setLevelUpVisible(true);
+    levelUpTimerRef.current = setTimeout(() => {
+      setLevelUpExiting(true);
+      setTimeout(() => { setLevelUpVisible(false); setLevelUpExiting(false); }, 400);
+    }, 1500);
+  };
+  const [subtitles, setSubtitles] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    getLevelMetadata().then((meta) => setSubtitles(meta as Record<number, string>)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!completionModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompletionModal(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completionModal]);
+
+  const handleMarkComplete = async () => {
+    if (!completionModal || !data) return;
+    const { level, value } = completionModal;
+    if ([1, 2, 3].includes(level) && !value.trim()) return;
+    setCompletionLoading(true);
+    try {
+      const result = await completeLevel(level);
+      if ([1, 2, 3].includes(level)) {
+        await setLevelMetadata(level, value.trim());
+        setSubtitles((prev) => ({ ...prev, [level]: value.trim() }));
+      }
+      setData((prev) => prev ? { ...prev, user: result.user } : prev);
+      setCompletionModal(null);
+      showLevelUpAnimation(result.user.currentLevel);
+    } finally {
+      setCompletionLoading(false);
+    }
+  };
 
   useEffect(() => {
     getDashboard().then((d) => { setData(d); setLoading(false); }).catch(() => setLoading(false));
@@ -189,6 +240,39 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Level-up animation */}
+      {levelUpVisible && (
+        <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', animation: 'levelup-backdrop-in 0.3s ease forwards' }}>
+          <div className="flex flex-col items-center gap-5 px-14 py-10 text-center"
+            style={{ backgroundColor: 'rgba(252,248,243,1)', border: '1px solid rgba(196,177,160,1)', borderRadius: 18, boxShadow: '0 8px 40px rgba(81,60,45,0.22)', animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'rgba(81,60,45,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}>
+              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(252,248,243,1)' }}>
+                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(140,115,95,1)' }}>Congratulations</p>
+              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(81,60,45,1)' }}>One step closer to your thesis</p>
+              {levelUpNumber && <p className="mt-2 text-sm" style={{ color: 'rgba(140,115,95,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark complete modal */}
+      {completionModal !== null && (
+        <CompletionModal
+          level={completionModal.level}
+          value={completionModal.value}
+          loading={completionLoading}
+          onChange={(v) => setCompletionModal({ level: completionModal.level, value: v })}
+          onConfirm={handleMarkComplete}
+          onClose={() => setCompletionModal(null)}
+        />
+      )}
+
       <div className="mx-auto max-w-4xl px-4 pt-8 flex flex-col gap-6">
 
         {/* Welcome */}
@@ -248,6 +332,11 @@ export default function Dashboard() {
                     <span style={{ fontSize: 11, color: C.mutedText }}>Level {level}</span>
                   </div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: C.darkBrown }}>{LEVEL_NAMES[level]}</p>
+                  {subtitles[level] && (
+                    <p style={{ fontSize: 11, color: C.mutedText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {subtitles[level]}
+                    </p>
+                  )}
                   {levelDeadlineMap[level] && !completed && (
                     <div className="mt-1.5 flex items-center gap-1.5">
                       <DeadlinePill days={days} />
@@ -255,6 +344,18 @@ export default function Dashboard() {
                     </div>
                   )}
                   {!unlocked && <p style={{ fontSize: 11, color: C.mutedText, marginTop: 4 }}>Complete previous levels first</p>}
+                  {isCurrent && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCompletionModal({ level, value: '' }); }}
+                      style={{
+                        marginTop: 10, fontSize: 11, fontWeight: 700, padding: '4px 12px',
+                        borderRadius: 99, border: `1px solid ${C.tan}`,
+                        background: C.lightTan, color: C.darkBrown, cursor: 'pointer',
+                      }}
+                    >
+                      Mark complete
+                    </button>
+                  )}
                 </div>
               );
             })}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuthStore } from '@/store/authStore';
+import { getLevelMetadata } from '@/services/authService';
 import mascotBackImage from '@/assets/dailycheckin-mascot-back.png';
 import mascotFrontImage from '@/assets/dailycheckin-mascot-front.png';
 
@@ -148,11 +149,19 @@ export default function DailyCheckin({ onComplete }: Props) {
     } catch { /* continue without history */ }
 
     try {
+      const thesisMeta: Record<string, string> = await getLevelMetadata().catch(() => ({}));
+      const thesisContext = [
+        thesisMeta['1'] ? `Thesis topic: ${thesisMeta['1']}` : null,
+        thesisMeta['2'] ? `Advisor: ${thesisMeta['2']}` : null,
+        thesisMeta['3'] ? `Research question: ${thesisMeta['3']}` : null,
+      ].filter(Boolean).join('\n') || undefined;
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           messages: [{ role: 'user', content: `Here's my daily check-in:\n${summary}\n\nMy thesis progress:\n${progressContext}${historyContext}\n\nGive me a short, motivating response and one concrete suggestion to get started today — building on what was done before, not repeating the same advice.` }],
+          thesisContext,
         }),
       });
       const resData = await res.json();

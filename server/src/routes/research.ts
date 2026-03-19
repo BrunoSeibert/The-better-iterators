@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -174,16 +175,18 @@ function libraryContext(papers: Paper[]): string {
 // POST /api/research/find-papers
 router.post('/find-papers', requireAuth, async (req: Request, res: Response) => {
   const { topic } = req.body;
+  const userId = (req as AuthRequest).userId;
   if (!topic) { res.status(400).json({ error: 'topic is required' }); return; }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
+    const thesisCtx = await getThesisContext(userId);
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a research librarian. Given a topic or problem, suggest 5–8 highly relevant academic papers.
+          content: `You are a research librarian. Given a topic or problem, suggest 5–8 highly relevant academic papers.${thesisCtx}
 
 Respond ONLY with valid JSON:
 {
@@ -225,11 +228,11 @@ router.post('/check-source', requireAuth, async (req: Request, res: Response) =>
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    const result = await db.query(
-      `SELECT * FROM research_papers WHERE id = $1 AND user_id = $2`,
-      [paperId, userId]
-    );
-    const paper: Paper = result.rows[0];
+    const [paperResult, thesisCtx] = await Promise.all([
+      db.query(`SELECT * FROM research_papers WHERE id = $1 AND user_id = $2`, [paperId, userId]),
+      getThesisContext(userId),
+    ]);
+    const paper: Paper = paperResult.rows[0];
     if (!paper) { res.status(404).json({ error: 'Paper not found' }); return; }
 
     const completion = await openai.chat.completions.create({
@@ -237,7 +240,7 @@ router.post('/check-source', requireAuth, async (req: Request, res: Response) =>
       messages: [
         {
           role: 'system',
-          content: `You are an academic source checker. Evaluate the credibility and quality of a given source.
+          content: `You are an academic source checker. Evaluate the credibility and quality of a given source.${thesisCtx}
 
 First identify the source type: journal article, conference paper, textbook, book chapter, thesis, preprint, or other.
 
@@ -281,10 +284,10 @@ router.post('/format-citation', requireAuth, async (req: Request, res: Response)
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    const result = await db.query(
-      `SELECT * FROM research_papers WHERE id = ANY($1::int[]) AND user_id = $2`,
-      [paperIds, userId]
-    );
+    const [result, thesisCtx] = await Promise.all([
+      db.query(`SELECT * FROM research_papers WHERE id = ANY($1::int[]) AND user_id = $2`, [paperIds, userId]),
+      getThesisContext(userId),
+    ]);
     const papers: Paper[] = result.rows;
     if (papers.length === 0) { res.status(404).json({ error: 'No papers found' }); return; }
 
@@ -297,7 +300,7 @@ router.post('/format-citation', requireAuth, async (req: Request, res: Response)
       messages: [
         {
           role: 'system',
-          content: `You are a citation formatter. Format the given papers in the requested citation style.
+          content: `You are a citation formatter. Format the given papers in the requested citation style.${thesisCtx}
 
 Respond ONLY with valid JSON:
 {
@@ -326,10 +329,10 @@ router.post('/concept-map', requireAuth, async (req: Request, res: Response) => 
   const userId = (req as AuthRequest).userId;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    const result = await db.query(
-      `SELECT * FROM research_papers WHERE user_id = $1 ORDER BY created_at ASC`,
-      [userId]
-    );
+    const [result, thesisCtx] = await Promise.all([
+      db.query(`SELECT * FROM research_papers WHERE user_id = $1 ORDER BY created_at ASC`, [userId]),
+      getThesisContext(userId),
+    ]);
     const papers: Paper[] = result.rows;
     if (papers.length < 2) { res.status(400).json({ error: 'Add at least 2 papers to generate a concept map' }); return; }
 
@@ -338,7 +341,7 @@ router.post('/concept-map', requireAuth, async (req: Request, res: Response) => 
       messages: [
         {
           role: 'system',
-          content: `You are a research analyst. Analyze the given library of papers and produce a concept map showing how themes cluster and connect.
+          content: `You are a research analyst. Analyze the given library of papers and produce a concept map showing how themes cluster and connect.${thesisCtx}
 
 Respond ONLY with valid JSON:
 {
@@ -384,10 +387,10 @@ router.post('/find-gaps', requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthRequest).userId;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
-    const result = await db.query(
-      `SELECT * FROM research_papers WHERE user_id = $1 ORDER BY created_at ASC`,
-      [userId]
-    );
+    const [result, thesisCtx] = await Promise.all([
+      db.query(`SELECT * FROM research_papers WHERE user_id = $1 ORDER BY created_at ASC`, [userId]),
+      getThesisContext(userId),
+    ]);
     const papers: Paper[] = result.rows;
     if (papers.length < 2) { res.status(400).json({ error: 'Add at least 2 papers to find gaps' }); return; }
 
@@ -396,7 +399,7 @@ router.post('/find-gaps', requireAuth, async (req: Request, res: Response) => {
       messages: [
         {
           role: 'system',
-          content: `You are a critical research analyst. Read this set of papers and identify what is missing, unexplored, or contested.
+          content: `You are a critical research analyst. Read this set of papers and identify what is missing, unexplored, or contested.${thesisCtx}
 
 Respond ONLY with valid JSON:
 {
@@ -447,6 +450,8 @@ router.post('/session-recap', requireAuth, async (req: Request, res: Response) =
       ? allPapers.filter((p) => sessionPaperIds.includes(p.id))
       : allPapers.slice(-3); // fallback: last 3 added
 
+    const thesisCtx = await getThesisContext(userId);
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -464,7 +469,7 @@ Respond ONLY with valid JSON:
 
 Rules:
 - patterns: 2–3 items max
-- nextStep must be actionable and specific to the papers seen, not generic advice`,
+- nextStep must be actionable and specific to the papers seen, not generic advice${thesisCtx}`,
         },
         {
           role: 'user',

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { db } from '../config/db';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getThesisContext } from '../services/authService';
 
 const router = Router();
 
@@ -61,6 +62,8 @@ router.post('/questions', requireAuth, async (req: Request, res: Response) => {
   try {
     const userContext = await getUserPresentationContext(userId);
 
+    const thesisCtx = await getThesisContext(userId);
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
@@ -83,7 +86,7 @@ Cover a mix of:
 Return ONLY valid JSON in this exact shape:
 {
   "questions": ["...", "..."]
-}`,
+}${thesisCtx}`,
         },
         {
           role: 'user',
@@ -129,7 +132,10 @@ router.post('/evaluate', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
-    const userContext = await getUserPresentationContext(userId);
+    const [userContext, thesisCtx] = await Promise.all([
+      getUserPresentationContext(userId),
+      getThesisContext(userId),
+    ]);
 
     const normalizedTranscript = transcriptEntries
       .filter((entry: any) => typeof entry?.text === 'string' && entry.text.trim().length > 0)
@@ -177,7 +183,7 @@ router.post('/evaluate', requireAuth, async (req: Request, res: Response) => {
       messages: [
         {
           role: 'system',
-          content: `You are a serious mock thesis defense coach.
+          content: `You are a serious mock thesis defense coach.${thesisCtx}
 
 The student completed a timed oral-defense simulation. You are given:
 - the ordered examiner-style questions

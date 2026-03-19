@@ -94,6 +94,42 @@ export async function progressLevel(req: AuthedRequest, res: Response) {
   }
 }
 
+export async function getLevelMetadata(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const data = await authService.getLevelMetadata(req.userId);
+    res.json({ metadata: data });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Unknown error' });
+  }
+}
+
+export async function setLevelMetadata(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const level = parseInt(req.params.level, 10);
+    const { value } = req.body as { value: string };
+    if (isNaN(level) || !value) return res.status(400).json({ error: 'Invalid input' });
+    const data = await authService.setLevelMetadata(req.userId, level, value);
+    res.json({ metadata: data });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Unknown error' });
+  }
+}
+
+export async function completeLevelById(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const level = parseInt(req.params.level, 10);
+    if (isNaN(level) || level < 1 || level > 6) return res.status(400).json({ error: 'Invalid level' });
+    const user = await authService.completeLevelById(req.userId, level);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Unknown error' });
+  }
+}
+
 export async function streakSummary(req: AuthedRequest, res: Response) {
   try {
     if (!req.userId) {

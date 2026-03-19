@@ -17,6 +17,7 @@ import LiteratureReview from '@/pages/LiteratureReview';
 import ResearchProposal from '@/pages/ResearchProposal';
 import ResearchWorkspace from '@/pages/ResearchWorkspace';
 import DailyCheckin from '@/components/DailyCheckin';
+import CompletionModal from '@/components/CompletionModal';
 import { DocumentReview } from '../document-review';
 import ThesisPresentationTestMode from '../presentation-test/ThesisPresentationTestMode';
 import studyonLogo from '@/assets/Study_Logo.png';
@@ -152,8 +153,11 @@ export default function Layout() {
       return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
     } catch { return true; }
   });
+  const [completionModal, setCompletionModal] = useState<{ level: number; value: string } | null>(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+
   const prevUnlockedRef = useRef<Set<string>>(new Set());
-  const isInitializedRef = useRef(false); 
+  const isInitializedRef = useRef(false);
 
   const queueHeart = useCallback((heart: HeartParticle) => {
     setHearts((currentHearts) => [...currentHearts, heart]);
@@ -332,6 +336,33 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const unlockedLevel = (e as CustomEvent<{ unlockedLevel: number }>).detail?.unlockedLevel;
+      setLevelUpNumber(unlockedLevel ?? null);
+      setLevelUpExiting(false);
+      setShowLevelUp(true);
+      if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+      levelUpTimeoutRef.current = window.setTimeout(() => {
+        setLevelUpExiting(true);
+        window.setTimeout(() => {
+          setShowLevelUp(false);
+          setLevelUpExiting(false);
+          levelUpTimeoutRef.current = null;
+        }, 400);
+      }, 1500);
+    };
+    window.addEventListener('level-up', handler);
+    return () => window.removeEventListener('level-up', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!completionModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompletionModal(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completionModal]);
+
+  useEffect(() => {
     if (!assistantOpen) {
       setHearts([]);
       heartTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -475,6 +506,23 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
+  const handleMarkComplete = async () => {
+    if (!completionModal) return;
+    const { level, value } = completionModal;
+    if ([1, 2, 3].includes(level) && !value.trim()) return;
+    setCompletionLoading(true);
+    try {
+      const result = await authService.completeLevel(level);
+      if ([1, 2, 3].includes(level)) {
+        await authService.setLevelMetadata(level, value.trim());
+      }
+      setCompletionModal(null);
+      await applyLevelState(result.user);
+    } finally {
+      setCompletionLoading(false);
+    }
+  };
+
   const handleCheckinButtonClick = () => {
     setCheckinOpen(true);
   };
@@ -616,16 +664,6 @@ const closeAssistant = () => {
           >
             Reset Level
           </button>
-          {completedStages.length < levels.length && (
-            <button
-              type="button"
-              onClick={() => updateLevel('progress')}
-              disabled={levelLoading}
-              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Progress Level
-            </button>
-          )}
         </div>
         <div className="ml-auto flex items-center gap-2">
         
@@ -737,6 +775,19 @@ const closeAssistant = () => {
             </div>
           </div>
 
+          {completedStages.length < levels.length && !completedStages.includes(activeLevel) && (
+            <div className="flex items-center justify-end bg-neutral-100 border-b border-neutral-200 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setCompletionModal({ level: activeLevel, value: '' })}
+                disabled={levelLoading}
+                className="rounded-full border border-neutral-300 bg-white px-4 py-1.5 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Mark complete ✓
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div
               className={`flex min-h-full flex-1 overflow-y-auto rounded-md p-3 ${
@@ -745,7 +796,7 @@ const closeAssistant = () => {
             >
               {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
-              {activeLevel === 3 && <ResearchProposal />}
+              {activeLevel === 3 && <ResearchProposal onMarkComplete={() => setCompletionModal({ level: 3, value: '' })} />}
               {activeLevel === 4 && <ResearchWorkspace />}
               {activeLevel === 5 && (
                 levelSixCorrecting ? (
@@ -898,6 +949,17 @@ const closeAssistant = () => {
           />
         ))}
       </div>
+
+      {completionModal !== null && (
+        <CompletionModal
+          level={completionModal.level}
+          value={completionModal.value}
+          loading={completionLoading}
+          onChange={(v) => setCompletionModal({ level: completionModal.level, value: v })}
+          onConfirm={handleMarkComplete}
+          onClose={() => setCompletionModal(null)}
+        />
+      )}
 
       {/* Daily check-in modal */}
       {checkinOpen && !checkinVerifying && (

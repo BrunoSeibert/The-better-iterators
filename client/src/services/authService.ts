@@ -111,6 +111,20 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+export async function completeLevel(level: number) {
+  const res = await api.post(`/auth/level/${level}/complete`);
+  return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
+}
+
+export async function getLevelMetadata(): Promise<Record<string, string>> {
+  const res = await api.get('/auth/level-metadata');
+  return res.data.metadata;
+}
+
+export async function setLevelMetadata(level: number, value: string): Promise<void> {
+  await api.patch(`/auth/level-metadata/${level}`, { value });
+}
+
 type TopicListItem = {
   id: string;
   title: string;
