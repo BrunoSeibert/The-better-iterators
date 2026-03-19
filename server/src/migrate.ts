@@ -29,6 +29,8 @@ export async function runMigrations() {
 
     ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS step_context INTEGER;
 
+    ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}';
+
     CREATE TABLE IF NOT EXISTS professor_matches (
       user_id TEXT NOT NULL,
       professor_id TEXT NOT NULL,

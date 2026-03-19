@@ -134,12 +134,12 @@ export async function completeOnboarding(
     { text: 'Outline your thesis chapter structure', level: 5 },
     { text: 'Write your thesis introduction', level: 5 },
   ];
-  for (const t of FIXED_TODOS) {
-    await db.query(
-      'INSERT INTO todos (id, user_id, text, done, level_link) VALUES (gen_random_uuid()::TEXT, $1, $2, false, $3)',
-      [userId, t.text, t.level]
-    );
-  }
+  const todoValues = FIXED_TODOS.map((_, i) => `(gen_random_uuid()::TEXT, $1, $${i * 2 + 2}, false, $${i * 2 + 3})`).join(', ');
+  const todoParams = FIXED_TODOS.flatMap((t) => [t.text, t.level]);
+  await db.query(
+    `INSERT INTO todos (id, user_id, text, done, level_link) VALUES ${todoValues}`,
+    [userId, ...todoParams]
+  );
 
   return { token: signToken(result.rows[0]) };
 }
@@ -220,7 +220,6 @@ export async function progressLevel(userId: string) {
 
 export async function getThesisContext(userId: string): Promise<string> {
   try {
-    await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
     const result = await db.query('SELECT level_metadata FROM "User" WHERE id = $1', [userId]);
     const meta = (result.rows[0]?.level_metadata as Record<string, string>) ?? {};
     const parts: string[] = [];
@@ -234,13 +233,11 @@ export async function getThesisContext(userId: string): Promise<string> {
 }
 
 export async function getLevelMetadata(userId: string): Promise<Record<string, string>> {
-  await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
   const result = await db.query('SELECT level_metadata FROM "User" WHERE id = $1', [userId]);
   return (result.rows[0]?.level_metadata as Record<string, string>) ?? {};
 }
 
 export async function setLevelMetadata(userId: string, level: number, value: string): Promise<Record<string, string>> {
-  await db.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS level_metadata JSONB DEFAULT '{}'`);
   const result = await db.query(
     `UPDATE "User"
      SET level_metadata = COALESCE(level_metadata, '{}') || jsonb_build_object($2::text, $3::text)
