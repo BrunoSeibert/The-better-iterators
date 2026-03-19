@@ -596,7 +596,7 @@ const closeAssistant = () => {
             {dailyStreak === null ? '...' : dailyStreak}
           </span>
         </button>
-        <div className="ml-8 hidden items-center gap-3 lg:ml-12">
+        <div className="ml-8 flex items-center gap-3 lg:ml-12">
           <button
             type="button"
             onClick={() => updateLevel('reset')}
@@ -617,12 +617,18 @@ const closeAssistant = () => {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleCheckinButtonClick}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
+          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
               type="button"
               onClick={openAssistant}
-              className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+              className="relative h-full w-full overflow-hidden rounded-[15%] transition hover:opacity-80"
               aria-label="Show AI Assistant"
             >
               <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
