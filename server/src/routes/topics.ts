@@ -66,7 +66,7 @@ router.get('/by-university', requireAuth, async (req, res) => {
       }
 
       const result = await db.query(
-        `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t.employment = 'no' AND t."universityId" IS DISTINCT FROM $1 AND (cardinality($2::text[]) = 0 OR t."fieldIds"::text[] && $2::text[]) ORDER BY t.id`,
+        `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t.employment = 'no' AND t."universityId" IS NOT NULL AND t."universityId" IS DISTINCT FROM $1 AND (cardinality($2::text[]) = 0 OR t."fieldIds"::text[] && $2::text[]) ORDER BY t.id`,
         [universityId, filterIds]
       );
       return res.json({ topics: mapRows(result.rows) });
