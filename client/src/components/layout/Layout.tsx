@@ -15,6 +15,7 @@ import AiAssistant from '../chat/AiAssistant';
 import Level2 from '@/pages/Level2';
 import LiteratureReview from '@/pages/LiteratureReview';
 import ResearchProposal from '@/pages/ResearchProposal';
+import ResearchWorkspace from '@/pages/ResearchWorkspace';
 import DailyCheckin from '@/components/DailyCheckin';
 import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
@@ -669,6 +670,7 @@ export default function Layout() {
               {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
               {activeLevel === 3 && <ResearchProposal />}
+              {activeLevel === 4 && <ResearchWorkspace />}
               {activeLevel === 5 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (

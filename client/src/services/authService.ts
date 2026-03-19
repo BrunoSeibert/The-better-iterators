@@ -278,6 +278,126 @@ export async function proposalGenerateFinal(
   return res.data;
 }
 
+// ── Research Workspace ──────────────────────────────────────────────────────
+
+export type ResearchPaper = {
+  id: number;
+  title: string;
+  authors?: string;
+  year?: number;
+  abstract?: string;
+  pdf_path?: string;
+  pdf_name?: string;
+  created_at: string;
+};
+
+export type FoundPaper = {
+  title: string;
+  authors: string;
+  year: number;
+  why: string;
+  scholarUrl: string;
+};
+
+export type SourceCheckResult = {
+  journalQuality: 'high' | 'medium' | 'low' | 'unknown';
+  peerReviewed: boolean;
+  citationContext: string;
+  flags: string[];
+  verdict: string;
+};
+
+export type ConceptMapResult = {
+  clusters: { id: string; label: string; theme: string; paperIndices: number[]; color: string }[];
+  connections: { from: string; to: string; label: string }[];
+  summary: string;
+  papers: { index: number; title: string; authors?: string }[];
+};
+
+export type GapAnalysisResult = {
+  gaps: { title: string; description: string }[];
+  contradictions: { title: string; description: string }[];
+  methodologicalGaps: { title: string; description: string }[];
+  suggestedDirections: string[];
+};
+
+export type SessionRecapResult = {
+  addedCount: number;
+  summary: string;
+  patterns: string[];
+  nextStep: string;
+};
+
+export async function getResearchLibrary(): Promise<ResearchPaper[]> {
+  const res = await api.get('/research/library');
+  return res.data.papers;
+}
+
+export async function addResearchPaper(paper: {
+  title: string;
+  authors?: string;
+  year?: number;
+  abstract?: string;
+}): Promise<ResearchPaper> {
+  const res = await api.post('/research/library', paper);
+  return res.data.paper;
+}
+
+export async function deleteResearchPaper(id: number): Promise<void> {
+  await api.delete(`/research/library/${id}`);
+}
+
+export async function researchFindPapers(topic: string): Promise<FoundPaper[]> {
+  const res = await api.post('/research/find-papers', { topic });
+  return res.data.papers;
+}
+
+export async function researchCheckSource(paperId: number): Promise<SourceCheckResult> {
+  const res = await api.post('/research/check-source', { paperId });
+  return res.data;
+}
+
+export async function researchFormatCitation(
+  paperIds: number[],
+  style: 'APA' | 'MLA' | 'Chicago'
+): Promise<string[]> {
+  const res = await api.post('/research/format-citation', { paperIds, style });
+  return res.data.citations;
+}
+
+export async function researchConceptMap(): Promise<ConceptMapResult> {
+  const res = await api.post('/research/concept-map');
+  return res.data;
+}
+
+export async function researchFindGaps(): Promise<GapAnalysisResult> {
+  const res = await api.post('/research/find-gaps');
+  return res.data;
+}
+
+export async function researchSessionRecap(sessionPaperIds?: number[]): Promise<SessionRecapResult> {
+  const res = await api.post('/research/session-recap', { sessionPaperIds });
+  return res.data;
+}
+
+export async function uploadResearchPdf(paperId: number, file: File): Promise<ResearchPaper> {
+  const form = new FormData();
+  form.append('pdf', file);
+  const res = await api.post(`/research/library/${paperId}/pdf`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.paper;
+}
+
+export async function deleteResearchPdf(paperId: number): Promise<void> {
+  await api.delete(`/research/library/${paperId}/pdf`);
+}
+
+export function getResearchPdfUrl(paperId: number): string {
+  const base = (api.defaults.baseURL ?? '').replace(/\/$/, '');
+  return `${base}/research/library/${paperId}/pdf`;
+}
+
 export async function completeOnboarding(data: {
   currentLevel: number;
   completedStages: number[];

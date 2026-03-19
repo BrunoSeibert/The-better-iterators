@@ -27,7 +27,7 @@ import literatureRoutes from './routes/literature';
 import mapRoutes from './routes/map';
 import checkinRoutes from './routes/checkin';
 import proposalRoutes from './routes/proposal';
-
+import researchRoutes from './routes/research';
 app.use('/api/map', mapRoutes);
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
@@ -37,6 +37,7 @@ app.use('/api/topics', topicsRoutes);
 app.use('/api/literature', literatureRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/proposal', proposalRoutes);
+app.use('/api/research', researchRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
