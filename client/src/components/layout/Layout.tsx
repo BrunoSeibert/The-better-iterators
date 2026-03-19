@@ -74,7 +74,7 @@ export default function Layout() {
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [dailyStreak, setDailyStreak] = useState(0);
+  const [dailyStreak, setDailyStreak] = useState<number | null>(() => authService.peekStreakSummary()?.currentStreak ?? null);
   const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
   const [levelSixDragging, setLevelSixDragging] = useState(false);
   const [levelSixCorrecting, setLevelSixCorrecting] = useState(false);
@@ -110,9 +110,8 @@ export default function Layout() {
   const prevUnlockedRef = useRef<Set<string>>(new Set());
   const isInitializedRef = useRef(false); 
 
-  const refreshLevelState = useCallback(
-    async (requestedActiveLevel?: number) => {
-      const { user: refreshedUser } = await authService.me();
+  const applyLevelState = useCallback(
+    async (refreshedUser: NonNullable<typeof user>, requestedActiveLevel?: number) => {
       const refreshedCompletedStages = refreshedUser.completedStages ?? [];
       const fallbackActiveLevel = getPreferredActiveLevel(
         refreshedUser.currentLevel,
@@ -131,7 +130,7 @@ export default function Layout() {
         const level = refreshedUser.currentLevel ?? 0;
         let streak = 0;
         try {
-          const summary = await authService.getStreakSummary();
+          const summary = await authService.getStreakSummary({ force: true });
           streak = summary.currentStreak;
         } catch {
           streak = 0;
@@ -150,6 +149,14 @@ export default function Layout() {
       };
     },
     [setUser]
+  );
+
+  const refreshLevelState = useCallback(
+    async (requestedActiveLevel?: number) => {
+      const { user: refreshedUser } = await authService.me();
+      return applyLevelState(refreshedUser, requestedActiveLevel);
+    },
+    [applyLevelState]
   );
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -269,14 +276,14 @@ export default function Layout() {
     let isMounted = true;
 
     authService
-      .getStreakSummary()
+      .getStreakSummary({ force: true })
       .then((summary) => {
         if (isMounted) {
           setDailyStreak(summary.currentStreak);
         }
       })
       .catch(() => {
-        if (isMounted) {
+        if (isMounted && authService.peekStreakSummary() === null) {
           setDailyStreak(0);
         }
       });
@@ -287,24 +294,25 @@ export default function Layout() {
   }, []);
 
   const level = user?.currentLevel ?? 0;
+  const resolvedDailyStreak = dailyStreak ?? 0;
 
   useEffect(() => {
     if (!isInitializedRef.current) return;
     
     const newlyUnlocked = BADGES.filter((badge) => {
-      const isUnlocked = badge.condition(dailyStreak, level);
+      const isUnlocked = badge.condition(resolvedDailyStreak, level);
       const wasUnlocked = prevUnlockedRef.current.has(badge.label);
       return isUnlocked && !wasUnlocked;
     });
 
     prevUnlockedRef.current = new Set(
-      BADGES.filter((b) => b.condition(dailyStreak, level)).map((b) => b.label)
+      BADGES.filter((b) => b.condition(resolvedDailyStreak, level)).map((b) => b.label)
     );
 
     if (newlyUnlocked.length > 0) {
       setAchievementQueue((prev) => [...prev, ...newlyUnlocked]);
     }
-  }, [dailyStreak, level]);
+  }, [level, resolvedDailyStreak]);
 
   const updateLevel = async (action: 'reset' | 'progress') => {
     if (levelLoading) {
@@ -315,12 +323,15 @@ export default function Layout() {
 
     try {
       const previousLevel = furthestUnlockedLevel;
-      if (action === 'reset') {
-        await authService.resetLevel();
-      } else {
-        await authService.progressLevel();
-      }
-      const refreshedState = await refreshLevelState();
+      const refreshedState = action === 'reset'
+        ? await (async () => {
+        const { user: refreshedUser } = await authService.resetLevel();
+            return applyLevelState(refreshedUser);
+          })()
+        : await (async () => {
+            const { user: refreshedUser } = await authService.progressLevel();
+            return applyLevelState(refreshedUser);
+          })();
 
       if (action === 'progress' && refreshedState.unlockedLevel > previousLevel) {
         setShowLevelUp(true);
@@ -468,7 +479,9 @@ export default function Layout() {
           aria-label="Open streak page"
         >
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
-          <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
+          <span className="text-xl font-semibold text-orange-400">
+            {dailyStreak === null ? '...' : `${dailyStreak} days`}
+          </span>
         </button>
         <div className="ml-8 flex items-center gap-3 lg:ml-12">
           <button
@@ -547,16 +560,16 @@ export default function Layout() {
               onPointerLeave={handlePointerUp}
               onWheel={handleWheel}
             >
-              <div className="relative h-12 w-full min-w-[36rem] px-1 sm:min-w-[42rem]">
-                <div className="absolute left-6 right-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-200" />
+              <div className="relative h-14 w-full min-w-[36rem] px-1 sm:min-w-[42rem]">
+                <div className="absolute left-6 right-6 top-1/2 h-[3px] -translate-y-1/2 rounded-sm border border-[rgba(196,177,160,0.55)] bg-neutral-200" />
                 <div
-                  className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
+                  className="absolute left-6 top-1/2 h-[3px] -translate-y-1/2 rounded-sm border border-[rgba(196,177,160,0.88)] bg-[rgba(206,183,161,1)] transition-all"
                   style={{
                     width: `calc((100% - 3rem) * ${Math.max(0, (furthestUnlockedLevel - 1) / (levels.length - 1))})`,
                   }}
                 />
 
-                <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
+                <div className="relative flex h-14 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
                     const isUnlocked = isLevelUnlocked(level, completedStages);
@@ -568,16 +581,14 @@ export default function Layout() {
                         type="button"
                         onClick={() => isUnlocked && void handleLevelSelect(level)}
                         disabled={!isUnlocked}
-                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
-                          isCompleted
-                            ? isActive
-                              ? 'border-green-600 bg-green-600 text-white'
-                              : 'border-green-500 bg-green-50 text-green-600 hover:bg-green-100'
+                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.4rem] border-2 text-base font-bold shadow-[0_1px_0_rgba(81,60,45,0.08)] transition ${
+                          isActive
+                            ? 'border-[rgba(81,60,45,1)] bg-[rgba(81,60,45,1)] text-[rgba(252,248,243,1)]'
+                            : isCompleted
+                              ? 'border-[rgba(150,201,89,1)] bg-[rgba(224,252,190,1)] text-[rgba(58,110,31,1)] hover:border-[rgba(132,186,73,1)] hover:bg-[rgba(232,255,205,1)]'
                             : isUnlocked
-                              ? isActive
-                                ? 'border-neutral-800 bg-neutral-800 text-white'
-                                : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
-                              : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
+                              ? 'border-[rgba(196,177,160,1)] bg-[rgba(231,214,194,1)] text-[rgba(95,72,54,1)] hover:border-[rgba(175,152,130,1)] hover:bg-[rgba(238,223,205,1)]'
+                            : 'cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-400'
                         }`}
                         aria-pressed={isActive}
                         aria-label={isUnlocked ? `Show level ${level}` : `Level ${level} is locked`}
@@ -589,7 +600,7 @@ export default function Layout() {
                         ) : isUnlocked ? (
                           level
                         ) : (
-                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current">
                             <path d="M16 10V8a4 4 0 1 0-8 0v2H7v10h10V10h-1Zm-6-2a2 2 0 1 1 4 0v2h-4V8Zm5 10H9v-6h6v6Z" />
                           </svg>
                         )}
