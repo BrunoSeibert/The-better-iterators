@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAnnotationWordMap } from './annotationModel';
-import { applyHighlightsToContainer } from './domHighlighter';
+import { applyHighlightsToContainer, clearReviewAnnotations } from './domHighlighter';
 import type { ParsedDocxReview } from './types';
 
 type DocxPreviewModule = {
@@ -61,7 +61,7 @@ export default function DocxReview({ document }: DocxReviewProps) {
           return;
         }
 
-        applyHighlightsToContainer(renderContainer, wordAnnotations, 0);
+        applyHighlightsToContainer(renderContainer, wordAnnotations, 0, document);
       } catch (error) {
         if (!isMounted) {
           return;
@@ -83,6 +83,10 @@ export default function DocxReview({ document }: DocxReviewProps) {
 
     return () => {
       isMounted = false;
+      const renderContainer = renderContainerRef.current;
+      if (renderContainer) {
+        clearReviewAnnotations(renderContainer);
+      }
     };
   }, [document.arrayBuffer, wordAnnotations]);
 

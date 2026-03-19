@@ -3,32 +3,56 @@ import type {
   AnnotationType,
   NormalizedWord,
   ReviewAnnotation,
+  ReviewSentence,
 } from './types';
 
-const reviewWordPattern = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
-
-const annotationComments: Record<AnnotationType, string> = {
-  standout: 'Potential standout passage.',
-  questionable: 'Potentially questionable wording.',
-  likely_error: 'Potential likely error worth checking.',
-};
+const reviewWordPattern = /[\p{L}\p{N}][\p{L}\p{N}'Ã¢â‚¬â„¢-]*/gu;
 
 export const annotationTones: Record<AnnotationType, AnnotationTone> = {
-  standout: {
-    background: 'rgba(134, 239, 172, 0.42)',
-    outline: 'rgba(74, 222, 128, 0.45)',
+  good: {
+    background: 'rgba(187, 247, 208, 0.42)',
+    outline: 'rgba(0, 0, 0, 0)',
   },
-  questionable: {
-    background: 'rgba(253, 186, 116, 0.42)',
-    outline: 'rgba(251, 146, 60, 0.42)',
+  improve: {
+    background: 'rgba(254, 215, 170, 0.42)',
+    outline: 'rgba(0, 0, 0, 0)',
   },
-  likely_error: {
-    background: 'rgba(252, 165, 165, 0.42)',
-    outline: 'rgba(248, 113, 113, 0.45)',
+  debug_green: {
+    background: 'rgba(187, 247, 208, 0.34)',
+    outline: 'rgba(0, 0, 0, 0)',
+  },
+  debug_orange: {
+    background: 'rgba(254, 215, 170, 0.34)',
+    outline: 'rgba(0, 0, 0, 0)',
+  },
+  debug_red: {
+    background: 'rgba(254, 202, 202, 0.34)',
+    outline: 'rgba(0, 0, 0, 0)',
+  },
+  debug_blue: {
+    background: 'rgba(191, 219, 254, 0.34)',
+    outline: 'rgba(0, 0, 0, 0)',
+  },
+  debug_purple: {
+    background: 'rgba(233, 213, 255, 0.34)',
+    outline: 'rgba(0, 0, 0, 0)',
   },
 };
 
-type RandomGenerator = () => number;
+export type AnnotationSourceScope = {
+  pageIndex: number;
+  text: string;
+  charStart: number;
+  wordStartIndex: number;
+  wordEndIndex: number;
+};
+
+export type ReviewSentenceDebug = {
+  rawSentenceCount: number;
+  finalSentenceCount: number;
+  bodyStartSentenceIndex: number | null;
+  bodyStartWordIndex: number | null;
+};
 
 export const buildNormalizedWords = (text: string): NormalizedWord[] => {
   const words: NormalizedWord[] = [];
@@ -53,108 +77,245 @@ export const buildNormalizedWords = (text: string): NormalizedWord[] => {
   return words;
 };
 
-export const createDeterministicAnnotations = (
-  fileName: string,
-  extractedText: string,
-  words: NormalizedWord[]
-): ReviewAnnotation[] => {
-  if (words.length === 0) {
-    return [];
-  }
+export const buildReviewSentences = (
+  scopes: AnnotationSourceScope[],
+  words: NormalizedWord[],
+  extractedText: string
+): ReviewSentence[] => buildReviewSentencesWithDebug(scopes, words, extractedText).sentences;
 
-  const eligibleWords = words.filter((word) => word.text.length >= 4);
-  const annotationCount = Math.min(
-    18,
-    Math.max(6, Math.floor(eligibleWords.length / 45))
+export const buildReviewSentencesWithDebug = (
+  scopes: AnnotationSourceScope[],
+  words: NormalizedWord[],
+  extractedText: string
+): { sentences: ReviewSentence[]; debug: ReviewSentenceDebug } => {
+  const pageRanges = scopes.map((scope) => ({
+    pageIndex: scope.pageIndex,
+    wordStartIndex: scope.wordStartIndex,
+    wordEndIndex: scope.wordEndIndex,
+  }));
+  const candidates = assignParagraphIndexes(
+    buildTokenOwnedSentences(words, extractedText, pageRanges),
+    extractedText
   );
+  const bodyStartOffset = findBodyStartOffset(candidates);
+  const sentences = candidates.slice(bodyStartOffset).map((sentence, index) => ({
+    ...sentence,
+    index,
+  }));
 
-  if (eligibleWords.length === 0 || annotationCount === 0) {
-    return [];
-  }
-
-  const random = createSeededRandom(`${fileName}:${extractedText.length}:${extractedText.slice(0, 512)}`);
-  const annotations: ReviewAnnotation[] = [];
-  const occupiedIndices = new Set<number>();
-  const annotationTypes: AnnotationType[] = ['standout', 'questionable', 'likely_error'];
-
-  let attempts = 0;
-
-  while (annotations.length < annotationCount && attempts < annotationCount * 20) {
-    attempts += 1;
-
-    const candidate = eligibleWords[Math.floor(random() * eligibleWords.length)];
-    const phraseLength = 1 + Math.floor(random() * 3);
-    const wordStartIndex = candidate.index;
-    const wordEndIndex = Math.min(words.length - 1, wordStartIndex + phraseLength - 1);
-
-    let hasConflict = false;
-    for (let currentIndex = wordStartIndex; currentIndex <= wordEndIndex; currentIndex += 1) {
-      if (occupiedIndices.has(currentIndex)) {
-        hasConflict = true;
-        break;
-      }
-    }
-
-    if (hasConflict) {
-      continue;
-    }
-
-    const type = annotationTypes[Math.floor(random() * annotationTypes.length)];
-    const start = words[wordStartIndex].start;
-    const end = words[wordEndIndex].end;
-    const quote = extractedText.slice(start, end);
-
-    annotations.push({
-      id: `annotation-${annotations.length}-${wordStartIndex}-${wordEndIndex}`,
-      type,
-      start,
-      end,
-      quote,
-      comment: annotationComments[type],
-      wordStartIndex,
-      wordEndIndex,
-    });
-
-    for (let currentIndex = wordStartIndex; currentIndex <= wordEndIndex; currentIndex += 1) {
-      occupiedIndices.add(currentIndex);
-    }
-  }
-
-  return annotations.sort((left, right) => left.wordStartIndex - right.wordStartIndex);
+  return {
+    sentences,
+    debug: {
+      rawSentenceCount: candidates.length,
+      finalSentenceCount: sentences.length,
+      bodyStartSentenceIndex: candidates[bodyStartOffset]?.index ?? null,
+      bodyStartWordIndex: candidates[bodyStartOffset]?.wordStartIndex ?? null,
+    },
+  };
 };
 
 export const buildAnnotationWordMap = (
   annotations: ReviewAnnotation[]
-): Map<number, AnnotationType> => {
-  const annotationWordMap = new Map<number, AnnotationType>();
+): Map<number, ReviewAnnotation> => {
+  const annotationWordMap = new Map<number, ReviewAnnotation>();
 
   annotations.forEach((annotation) => {
-    for (
-      let wordIndex = annotation.wordStartIndex;
-      wordIndex <= annotation.wordEndIndex;
-      wordIndex += 1
-    ) {
-      annotationWordMap.set(wordIndex, annotation.type);
-    }
+    annotation.tokenIndexes.forEach((wordIndex) => {
+      annotationWordMap.set(wordIndex, annotation);
+    });
   });
 
   return annotationWordMap;
 };
 
-const createSeededRandom = (seedInput: string): RandomGenerator => {
-  let seed = 2166136261;
+export const rangesOverlap = (
+  startA: number,
+  endA: number,
+  startB: number,
+  endB: number
+) => startA <= endB && startB <= endA;
 
-  for (let characterIndex = 0; characterIndex < seedInput.length; characterIndex += 1) {
-    seed ^= seedInput.charCodeAt(characterIndex);
-    seed = Math.imul(seed, 16777619);
+const buildTokenOwnedSentences = (
+  words: NormalizedWord[],
+  extractedText: string,
+  pageRanges: Array<{ pageIndex: number; wordStartIndex: number; wordEndIndex: number }>
+) => {
+  const sentences: ReviewSentence[] = [];
+  let currentTokenIndexes: number[] = [];
+  let currentSentenceStart = 0;
+
+  words.forEach((word, index) => {
+    if (currentTokenIndexes.length === 0) {
+      currentSentenceStart = word.start;
+    }
+
+    currentTokenIndexes.push(word.index);
+    const nextWord = words[index + 1];
+    const gapText = extractedText.slice(word.end, nextWord?.start ?? extractedText.length);
+    const sentenceEndsHere =
+      nextWord === undefined
+      || hasStrongLineBreak(gapText)
+      || /[.!?]+/.test(gapText);
+
+    if (!sentenceEndsHere) {
+      return;
+    }
+
+    const sentenceEnd = nextWord === undefined
+      ? extractedText.length
+      : trimSentenceBoundary(extractedText, word.end, nextWord.start);
+    const sentenceText = normalizeSentenceText(extractedText.slice(currentSentenceStart, sentenceEnd));
+
+    if (isRenderableChunkUnit(sentenceText)) {
+      const firstTokenIndex = currentTokenIndexes[0];
+      const lastTokenIndex = currentTokenIndexes[currentTokenIndexes.length - 1];
+
+      sentences.push({
+        index: sentences.length,
+        pageIndex: findPageIndexForWord(firstTokenIndex, pageRanges),
+        paragraphIndex: 0,
+        text: sentenceText,
+        start: currentSentenceStart,
+        end: sentenceEnd,
+        wordStartIndex: firstTokenIndex,
+        wordEndIndex: lastTokenIndex,
+        tokenIndexes: [...currentTokenIndexes],
+      });
+    }
+
+    currentTokenIndexes = [];
+  });
+
+  if (currentTokenIndexes.length > 0) {
+    const firstTokenIndex = currentTokenIndexes[0];
+    const lastTokenIndex = currentTokenIndexes[currentTokenIndexes.length - 1];
+    const trailingSentenceText = normalizeSentenceText(
+      extractedText.slice(words[firstTokenIndex].start, words[lastTokenIndex].end)
+    );
+
+    if (isRenderableChunkUnit(trailingSentenceText)) {
+      sentences.push({
+        index: sentences.length,
+        pageIndex: findPageIndexForWord(firstTokenIndex, pageRanges),
+        paragraphIndex: 0,
+        text: trailingSentenceText,
+        start: words[firstTokenIndex].start,
+        end: words[lastTokenIndex].end,
+        wordStartIndex: firstTokenIndex,
+        wordEndIndex: lastTokenIndex,
+        tokenIndexes: [...currentTokenIndexes],
+      });
+    }
   }
 
-  return () => {
-    seed += 0x6d2b79f5;
-    let value = seed;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
+  return sentences.filter((sentence) => sentence.tokenIndexes.length > 0 && /[A-Za-z0-9]/.test(sentence.text));
 };
 
+const assignParagraphIndexes = (sentences: ReviewSentence[], extractedText: string) => {
+  let paragraphIndex = 0;
+
+  return sentences.map((sentence, index) => {
+    if (index > 0) {
+      const previousSentence = sentences[index - 1];
+      const boundaryText = extractedText.slice(previousSentence.end, sentence.start);
+
+      if (
+        sentence.pageIndex !== previousSentence.pageIndex
+        || hasParagraphBreak(boundaryText)
+      ) {
+        paragraphIndex += 1;
+      }
+    }
+
+    return {
+      ...sentence,
+      paragraphIndex,
+    };
+  });
+};
+
+const trimSentenceBoundary = (text: string, start: number, end: number) => {
+  let boundary = end;
+
+  while (boundary > start && /\s/.test(text[boundary - 1] ?? '')) {
+    boundary -= 1;
+  }
+
+  return boundary;
+};
+
+const normalizeSentenceText = (sentence: string) => sentence.replace(/\s+/g, ' ').trim();
+
+const hasParagraphBreak = (boundaryText: string) => {
+  if (!boundaryText) {
+    return false;
+  }
+
+  return /\n\s*\n/.test(boundaryText) || /\t/.test(boundaryText);
+};
+
+const hasStrongLineBreak = (boundaryText: string) => {
+  if (!boundaryText) {
+    return false;
+  }
+
+  return /\n/.test(boundaryText) || /\t/.test(boundaryText);
+};
+
+const findPageIndexForWord = (
+  wordIndex: number,
+  pageRanges: Array<{ pageIndex: number; wordStartIndex: number; wordEndIndex: number }>
+) => {
+  return pageRanges.find(
+    (range) => wordIndex >= range.wordStartIndex && wordIndex <= range.wordEndIndex
+  )?.pageIndex ?? 0;
+};
+
+const findBodyStartOffset = (sentences: ReviewSentence[]) => {
+  for (let index = 0; index < sentences.length; index += 1) {
+    if (looksLikeBodySentence(sentences[index].text)) {
+      return index;
+    }
+  }
+
+  return 0;
+};
+
+const looksLikeBodySentence = (sentence: string) => {
+  const condensed = normalizeSentenceText(sentence);
+  const words = condensed.split(' ').filter(Boolean);
+
+  if (!isRenderableChunkUnit(condensed)) {
+    return false;
+  }
+
+  if (words.length < 5) {
+    return false;
+  }
+
+  const alphaMatches = condensed.match(/[A-Za-z]/g) ?? [];
+  return condensed.length > 0 && alphaMatches.length / condensed.length >= 0.35;
+};
+
+const isRenderableChunkUnit = (sentence: string) => {
+  const condensed = normalizeSentenceText(sentence);
+
+  if (!condensed) {
+    return false;
+  }
+
+  if (!/[A-Za-z0-9]/.test(condensed)) {
+    return false;
+  }
+
+  const words = condensed.split(' ').filter(Boolean);
+  if (words.length < 1) {
+    return false;
+  }
+
+  if (/^\d+$/.test(condensed)) {
+    return false;
+  }
+
+  return true;
+};

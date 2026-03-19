@@ -60,16 +60,16 @@ export default function AiAssistant() {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex-1 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-4 text-sm">
+      <div className="flex-1 overflow-y-auto rounded-[0.5rem] border border-neutral-200 bg-white p-4 text-sm">
         {messages.map((msg, i) => (
           <div
             key={i}
             className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-xl px-3 py-2 ${
+              className={`max-w-[85%] rounded-[0.42rem] px-3 py-2 ${
                 msg.role === 'user'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-[rgba(114,96,84,1)] text-[rgba(245,239,231,1)]'
                   : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
               }`}
             >
@@ -90,7 +90,7 @@ export default function AiAssistant() {
         ))}
         {loading && (
           <div className="mb-3 flex justify-start">
-            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-neutral-400">...</div>
+            <div className="rounded-[0.42rem] border border-neutral-200 bg-neutral-50 px-3 py-2 text-neutral-400">...</div>
           </div>
         )}
         <div ref={bottomRef} />
@@ -105,12 +105,12 @@ export default function AiAssistant() {
             if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
           }}
           placeholder="Type a message..."
-          className="flex-1 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400"
+          className="flex-1 rounded-[0.42rem] border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-400"
         />
         <button
           onClick={sendMessage}
           disabled={loading || !input.trim()}
-          className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-30"
+          className="rounded-[0.32rem] border-2 border-[rgba(81,60,45,1)] bg-[rgba(197,171,146,1)] px-4 py-2 text-sm font-medium text-[rgba(81,60,45,1)] transition hover:bg-[rgba(189,163,138,1)] hover:text-[rgba(63,46,33,1)] disabled:opacity-30"
         >
           Send
         </button>

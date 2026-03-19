@@ -345,7 +345,7 @@ export default function Layout() {
     }
 
     setLevelSixFile(file);
-    setLevelSixCorrecting(false);
+    setLevelSixCorrecting(true);
     setLevelSixDragging(false);
   };
 
@@ -629,7 +629,7 @@ export default function Layout() {
                       <span className="mt-2 text-sm text-neutral-400">
                         PDF, DOC, DOCX, TXT, RTF
                       </span>
-                      <span className="mt-5 rounded-full border border-neutral-300 bg-neutral-50 px-5 py-2 text-sm font-medium text-neutral-600 transition group-hover:border-neutral-400 group-hover:bg-neutral-100">
+                      <span className="mt-5 rounded-[0.32rem] border-2 border-[rgba(166,166,166,0.82)] bg-[rgba(246,246,246,0.98)] px-5 py-2 text-sm font-medium text-[rgba(79,79,79,0.96)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] transition group-hover:border-[rgba(132,132,132,0.9)] group-hover:bg-[rgba(250,250,250,0.99)] group-hover:text-[rgba(47,47,47,0.96)]">
                         Choose file
                       </span>
                       {levelSixFile && (
@@ -638,17 +638,6 @@ export default function Layout() {
                         </span>
                       )}
                     </label>
-                    {levelSixFile && (
-                      <div className="flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setLevelSixCorrecting(true)}
-                          className="rounded-full bg-neutral-900 px-10 py-4 text-base font-semibold text-white shadow-[0_18px_40px_-20px_rgba(23,23,23,0.95)] transition hover:bg-neutral-800"
-                        >
-                          Correct
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )
               )}

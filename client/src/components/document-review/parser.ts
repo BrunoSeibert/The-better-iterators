@@ -1,9 +1,6 @@
 import mammoth from 'mammoth';
 import { pdfjs } from 'react-pdf';
-import {
-  buildNormalizedWords,
-  createDeterministicAnnotations,
-} from './annotationModel';
+import { buildNormalizedWords, buildReviewSentencesWithDebug } from './annotationModel';
 import type {
   ParsedDocxReview,
   ParsedPdfPage,
@@ -37,19 +34,18 @@ const parsePdfReview = async (file: File): Promise<ParsedReviewResult> => {
     const pages: ParsedPdfPage[] = [];
     const extractedPageTexts: string[] = [];
     let runningWordIndex = 0;
+    let runningCharIndex = 0;
 
     for (let pageIndex = 0; pageIndex < pdfDocument.numPages; pageIndex += 1) {
       const page = await pdfDocument.getPage(pageIndex + 1);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item) => ('str' in item ? item.str : ''))
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const pageText = buildPdfPageText(textContent.items);
 
       const pageWords = buildNormalizedWords(pageText);
       pages.push({
         pageNumber: pageIndex + 1,
+        charStart: runningCharIndex,
+        charEnd: runningCharIndex + pageText.length,
         wordStartIndex: runningWordIndex,
         wordEndIndex: runningWordIndex + Math.max(0, pageWords.length - 1),
         extractedText: pageText,
@@ -57,6 +53,7 @@ const parsePdfReview = async (file: File): Promise<ParsedReviewResult> => {
 
       runningWordIndex += pageWords.length;
       extractedPageTexts.push(pageText);
+      runningCharIndex += pageText.length + 2;
     }
 
     await pdfDocument.destroy();
@@ -71,6 +68,29 @@ const parsePdfReview = async (file: File): Promise<ParsedReviewResult> => {
       return createError(file.name, 'Error: No readable text could be extracted from this file.');
     }
 
+    const sentenceResult = buildReviewSentencesWithDebug(
+      pages.map((page, pageIndex) => ({
+        pageIndex,
+        text: page.extractedText,
+        charStart: page.charStart,
+        wordStartIndex: page.wordStartIndex,
+        wordEndIndex: page.wordEndIndex,
+      })),
+      words,
+      extractedText
+    );
+
+    console.groupCollapsed('[document-review] sentence extraction');
+    console.log({
+      fileName: file.name,
+      extractedTextLength: extractedText.length,
+      rawSentenceCount: sentenceResult.debug.rawSentenceCount,
+      finalSentenceCount: sentenceResult.debug.finalSentenceCount,
+      bodyStartSentenceIndex: sentenceResult.debug.bodyStartSentenceIndex,
+      bodyStartWordIndex: sentenceResult.debug.bodyStartWordIndex,
+    });
+    console.groupEnd();
+
     const parsedReview: ParsedPdfReview = {
       kind: 'pdf',
       fileName: file.name,
@@ -79,7 +99,8 @@ const parsePdfReview = async (file: File): Promise<ParsedReviewResult> => {
       pages,
       extractedText,
       words,
-      annotations: createDeterministicAnnotations(file.name, extractedText, words),
+      sentences: sentenceResult.sentences,
+      annotations: [],
     };
 
     return parsedReview;
@@ -107,6 +128,31 @@ const parseDocxReview = async (file: File): Promise<ParsedReviewResult> => {
       return createError(file.name, 'Error: No readable text could be extracted from this file.');
     }
 
+    const sentenceResult = buildReviewSentencesWithDebug(
+      [
+        {
+          pageIndex: 0,
+          text: extractedText,
+          charStart: 0,
+          wordStartIndex: 0,
+          wordEndIndex: Math.max(0, words.length - 1),
+        },
+      ],
+      words,
+      extractedText
+    );
+
+    console.groupCollapsed('[document-review] sentence extraction');
+    console.log({
+      fileName: file.name,
+      extractedTextLength: extractedText.length,
+      rawSentenceCount: sentenceResult.debug.rawSentenceCount,
+      finalSentenceCount: sentenceResult.debug.finalSentenceCount,
+      bodyStartSentenceIndex: sentenceResult.debug.bodyStartSentenceIndex,
+      bodyStartWordIndex: sentenceResult.debug.bodyStartWordIndex,
+    });
+    console.groupEnd();
+
     const parsedReview: ParsedDocxReview = {
       kind: 'docx',
       fileName: file.name,
@@ -114,7 +160,8 @@ const parseDocxReview = async (file: File): Promise<ParsedReviewResult> => {
       arrayBuffer,
       extractedText,
       words,
-      annotations: createDeterministicAnnotations(file.name, extractedText, words),
+      sentences: sentenceResult.sentences,
+      annotations: [],
     };
 
     return parsedReview;
@@ -155,4 +202,68 @@ const createError = (
   message,
   detail,
 });
+
+const buildPdfPageText = (items: Array<unknown>) => {
+  let pageText = '';
+  let previousItem: {
+    str: string;
+    y: number;
+    height: number;
+    hasEOL: boolean;
+  } | null = null;
+
+  items.forEach((item) => {
+    if (!item || typeof item !== 'object' || !('str' in item)) {
+      return;
+    }
+
+    const text = typeof item.str === 'string' ? item.str : '';
+    if (!text.trim()) {
+      return;
+    }
+
+    const transform = 'transform' in item && Array.isArray(item.transform) ? item.transform : null;
+    const y = typeof transform?.[5] === 'number' ? transform[5] : 0;
+    const height = typeof transform?.[3] === 'number' ? Math.abs(transform[3]) : 0;
+    const hasEOL = 'hasEOL' in item && item.hasEOL === true;
+
+    if (!previousItem) {
+      pageText += text;
+      previousItem = { str: text, y, height, hasEOL };
+      return;
+    }
+
+    const separator = determinePdfSeparator(previousItem, { str: text, y, height, hasEOL });
+    pageText += separator + text;
+    previousItem = { str: text, y, height, hasEOL };
+  });
+
+  return pageText.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const determinePdfSeparator = (
+  previousItem: { str: string; y: number; height: number; hasEOL: boolean },
+  nextItem: { str: string; y: number; height: number; hasEOL: boolean }
+) => {
+  const yGap = Math.abs(previousItem.y - nextItem.y);
+  const baselineHeight = Math.max(previousItem.height, nextItem.height, 1);
+
+  if (previousItem.hasEOL) {
+    return yGap > baselineHeight * 1.4 ? '\n\n' : '\n';
+  }
+
+  if (yGap > baselineHeight * 1.4) {
+    return '\n\n';
+  }
+
+  if (yGap > baselineHeight * 0.45) {
+    return '\n';
+  }
+
+  if (/[([{"'“]$/.test(previousItem.str) || /^[)\]}"'”:;,.!?]/.test(nextItem.str)) {
+    return '';
+  }
+
+  return ' ';
+};
 

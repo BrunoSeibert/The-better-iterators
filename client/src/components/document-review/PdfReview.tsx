@@ -3,8 +3,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { buildAnnotationWordMap } from './annotationModel';
-import { applyHighlightsToContainer } from './domHighlighter';
-import type { ParsedPdfPage, ParsedPdfReview } from './types';
+import { applyHighlightsToContainer, clearReviewAnnotations } from './domHighlighter';
+import type { ParsedPdfPage, ParsedPdfReview, ReviewAnnotation } from './types';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -50,6 +50,7 @@ export default function PdfReview({ document, availableWidth }: PdfReviewProps) 
             return (
               <PdfReviewPage
                 key={`pdf-page-${pageNumber}`}
+                documentModel={document}
                 pageModel={pageModel}
                 pageNumber={pageNumber}
                 renderWidth={renderWidth}
@@ -64,13 +65,15 @@ export default function PdfReview({ document, availableWidth }: PdfReviewProps) 
 }
 
 type PdfReviewPageProps = {
+  documentModel: ParsedPdfReview;
   pageModel: ParsedPdfPage | undefined;
   pageNumber: number;
   renderWidth: number;
-  wordAnnotations: Map<number, 'standout' | 'questionable' | 'likely_error'>;
+  wordAnnotations: Map<number, ReviewAnnotation>;
 };
 
 function PdfReviewPage({
+  documentModel,
   pageModel,
   pageNumber,
   renderWidth,
@@ -85,8 +88,12 @@ function PdfReviewPage({
       return;
     }
 
-    applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex);
-  }, [pageModel, renderWidth, wordAnnotations]);
+    applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
+
+    return () => {
+      clearReviewAnnotations(textLayer);
+    };
+  }, [documentModel, pageModel, renderWidth, wordAnnotations]);
 
   return (
     <div
@@ -104,7 +111,7 @@ function PdfReviewPage({
             const textLayer = pageRootRef.current?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
 
             if (textLayer && pageModel) {
-              applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex);
+              applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
             }
           }}
         />

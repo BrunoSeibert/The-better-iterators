@@ -21,11 +21,13 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 import { chatRouter } from './routes/chat';
 import authRoutes from './routes/authRoutes';
 import dataRoutes from './routes/data';
+import { reviewRouter } from './routes/review';
 import topicsRoutes from './routes/topics';
 import literatureRoutes from './routes/literature';
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
+app.use('/api/review', reviewRouter);
 app.use('/api/topics', topicsRoutes);
 app.use('/api/literature', literatureRoutes);
 
