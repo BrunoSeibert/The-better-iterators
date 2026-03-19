@@ -2,6 +2,17 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { db } from '../config/db';
 
+const LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
+const UNLOCK_DEPS: Record<number, number[]> = {
+  1: [],
+  2: [],
+  3: [1],
+  4: [1, 2, 3],
+  5: [4],
+  6: [5],
+  7: [6],
+};
+
 function getLocalDateKey(date = new Date()) {
   return [
     date.getFullYear(),
@@ -17,6 +28,22 @@ export async function touchDailyLogin(userId: string) {
      ON CONFLICT (user_id, login_date) DO NOTHING`,
     [userId, getLocalDateKey()]
   );
+}
+
+function normalizeCompletedStages(completedStages: unknown): number[] {
+  if (!Array.isArray(completedStages)) {
+    return [];
+  }
+
+  return [...new Set(completedStages.filter((stage): stage is number => typeof stage === 'number'))].sort((a, b) => a - b);
+}
+
+function isLevelUnlocked(level: number, completedStages: number[]) {
+  return UNLOCK_DEPS[level]?.every((dependency) => completedStages.includes(dependency)) ?? false;
+}
+
+function getFirstOpenLevel(completedStages: number[]) {
+  return LEVELS.find((level) => isLevelUnlocked(level, completedStages) && !completedStages.includes(level)) ?? 1;
 }
 
 function signToken(user: { id: string; name: string; email: string; is_onboarded: boolean; current_level: number; completed_stages?: number[] }) {
@@ -79,7 +106,7 @@ export async function completeOnboarding(
 
 export async function getUserById(userId: string) {
   const result = await db.query(
-    'SELECT id, name, email, current_level, first_login_date FROM "User" WHERE id = $1',
+    'SELECT id, name, email, is_onboarded, current_level, completed_stages, first_login_date FROM "User" WHERE id = $1',
     [userId]
   );
   return result.rows[0] ?? null;
@@ -87,16 +114,42 @@ export async function getUserById(userId: string) {
 
 export async function resetLevel(userId: string) {
   const result = await db.query(
-    'UPDATE "User" SET current_level = 1 WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
-    [userId]
+    'UPDATE "User" SET current_level = $1, completed_stages = $2 WHERE id = $3 RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date',
+    [1, [], userId]
   );
   return result.rows[0] ?? null;
 }
 
 export async function progressLevel(userId: string) {
-  const result = await db.query(
-    'UPDATE "User" SET current_level = LEAST(COALESCE(current_level, 1) + 1, 7) WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
+  const currentResult = await db.query(
+    'SELECT current_level, completed_stages FROM "User" WHERE id = $1',
     [userId]
+  );
+  const currentUser = currentResult.rows[0];
+
+  if (!currentUser) {
+    return null;
+  }
+
+  const completedStages = normalizeCompletedStages(currentUser.completed_stages);
+  const progressableLevel =
+    (typeof currentUser.current_level === 'number'
+      && isLevelUnlocked(currentUser.current_level, completedStages)
+      && !completedStages.includes(currentUser.current_level)
+      ? currentUser.current_level
+      : getFirstOpenLevel(completedStages));
+  const nextCompletedStages = completedStages.includes(progressableLevel)
+    ? completedStages
+    : [...completedStages, progressableLevel];
+  const nextLevel = getFirstOpenLevel(nextCompletedStages);
+
+  const result = await db.query(
+    `UPDATE "User"
+     SET current_level = $1,
+         completed_stages = $2
+     WHERE id = $3
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date`,
+    [nextLevel, nextCompletedStages, userId]
   );
   return result.rows[0] ?? null;
 }

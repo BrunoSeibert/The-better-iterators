@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type ChangeEvent,
   type DragEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -9,33 +10,17 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Document, Page, pdfjs } from 'react-pdf';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import AiAssistant from '../chat/AiAssistant';
 import Level2 from '@/pages/Level2';
+import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-
 const levels = Array.from({ length: 7 }, (_, index) => index + 1);
 const topbarHeight = 'max(10vh, 72px)';
 const assistantPanelWidth = 'clamp(320px, 32vw, 380px)';
-const getAssistantPanelPixels = (viewportWidth: number) =>
-  Math.min(380, Math.max(320, viewportWidth * 0.32));
-const getPdfPreviewWidth = (
-  viewportWidth: number,
-  isAssistantOpen: boolean,
-  containerWidth?: number
-) => {
-  const fallbackWidth =
-    viewportWidth - (isAssistantOpen ? getAssistantPanelPixels(viewportWidth) : 0) - 176;
-  const availableWidth = containerWidth ?? fallbackWidth;
-
-  return Math.max(220, Math.min(760, Math.floor(availableWidth - 96)));
-};
 
 type RectState = {
   top: number;
@@ -48,19 +33,38 @@ const UNLOCK_DEPS: Record<number, number[]> = {
   1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
 };
 
+function isLevelUnlocked(level: number, completedStages: number[]) {
+  return UNLOCK_DEPS[level]?.every((dependency) => completedStages.includes(dependency)) ?? false;
+}
+
+function getFirstOpenLevel(completedStages: number[]) {
+  return levels.find((level) => isLevelUnlocked(level, completedStages) && !completedStages.includes(level)) ?? 1;
+}
+
+function getFurthestUnlockedLevel(completedStages: number[]) {
+  return [...levels].reverse().find((level) => isLevelUnlocked(level, completedStages)) ?? 1;
+}
+
+function getPreferredActiveLevel(currentLevel: number | undefined, completedStages: number[]) {
+  if (
+    typeof currentLevel === 'number' &&
+    isLevelUnlocked(currentLevel, completedStages) &&
+    !completedStages.includes(currentLevel)
+  ) {
+    return currentLevel;
+  }
+
+  return getFirstOpenLevel(completedStages);
+}
+
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
   const completedStages = user?.completedStages ?? [];
-
-  function isUnlockedFn(level: number) {
-    return UNLOCK_DEPS[level]?.every((d) => completedStages.includes(d)) ?? false;
-  }
-
-  const firstActive = levels.find((l) => isUnlockedFn(l) && !completedStages.includes(l)) ?? 1;
-  const [activeLevel, setActiveLevel] = useState(firstActive);
-  const [unlockedLevel, setUnlockedLevel] = useState(firstActive);
+  const preferredActiveLevel = getPreferredActiveLevel(user?.currentLevel, completedStages);
+  const furthestUnlockedLevel = getFurthestUnlockedLevel(completedStages);
+  const [activeLevel, setActiveLevel] = useState(preferredActiveLevel);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -68,15 +72,6 @@ export default function Layout() {
   const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
   const [levelSixDragging, setLevelSixDragging] = useState(false);
   const [levelSixCorrecting, setLevelSixCorrecting] = useState(false);
-  const [levelSixPreviewKind, setLevelSixPreviewKind] = useState<
-    'text' | 'pdf' | 'document' | null
-  >(null);
-  const [levelSixPdfPages, setLevelSixPdfPages] = useState(0);
-  const [levelSixPdfRenderWidth, setLevelSixPdfRenderWidth] = useState(() =>
-    typeof window === 'undefined' ? 220 : getPdfPreviewWidth(window.innerWidth, true)
-  );
-  const [levelSixPreviewText, setLevelSixPreviewText] = useState('');
-  const [levelSixPreviewUrl, setLevelSixPreviewUrl] = useState<string | null>(null);
   const [badgerTransition, setBadgerTransition] = useState<{
     from: RectState;
     to: RectState;
@@ -85,7 +80,6 @@ export default function Layout() {
   const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
   const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
-  const levelSixPdfContainerRef = useRef<HTMLDivElement | null>(null);
   const badgerButtonSlotRef = useRef<HTMLDivElement | null>(null);
   const assistantBadgerRef = useRef<HTMLImageElement | null>(null);
   const badgerTransitionTimeoutRef = useRef<number | null>(null);
@@ -95,6 +89,32 @@ export default function Layout() {
     startX: 0,
     scrollLeft: 0,
   });
+
+  const refreshLevelState = useCallback(
+    async (requestedActiveLevel?: number) => {
+      const { user: refreshedUser } = await authService.me();
+      const refreshedCompletedStages = refreshedUser.completedStages ?? [];
+      const fallbackActiveLevel = getPreferredActiveLevel(
+        refreshedUser.currentLevel,
+        refreshedCompletedStages
+      );
+      const nextActiveLevel =
+        typeof requestedActiveLevel === 'number'
+        && isLevelUnlocked(requestedActiveLevel, refreshedCompletedStages)
+          ? requestedActiveLevel
+          : fallbackActiveLevel;
+
+      setUser(refreshedUser);
+      setActiveLevel(nextActiveLevel);
+
+      return {
+        user: refreshedUser,
+        activeLevel: nextActiveLevel,
+        unlockedLevel: getFurthestUnlockedLevel(refreshedCompletedStages),
+      };
+    },
+    [setUser]
+  );
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
@@ -163,34 +183,23 @@ export default function Layout() {
   };
 
   useEffect(() => {
-    if (!user?.currentLevel) {
+    if (!user) {
       return;
     }
 
-    setUnlockedLevel(user.currentLevel);
     setActiveLevel((currentActiveLevel) =>
-      currentActiveLevel > user.currentLevel! ? user.currentLevel! : currentActiveLevel
+      isLevelUnlocked(currentActiveLevel, completedStages) ? currentActiveLevel : preferredActiveLevel
     );
-  }, [user?.currentLevel]);
+  }, [completedStages, preferredActiveLevel, user]);
 
   useEffect(() => {
-    if ((user && typeof user.currentLevel === 'number') || !localStorage.getItem('token')) {
+    if (!localStorage.getItem('token')) {
       return;
     }
 
     let isMounted = true;
 
-    authService
-      .me()
-      .then(({ user: fetchedUser }) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setUser(fetchedUser);
-        setUnlockedLevel(fetchedUser.current_level);
-        setActiveLevel(fetchedUser.current_level);
-      })
+    refreshLevelState()
       .catch(() => {
         if (!isMounted) {
           return;
@@ -203,7 +212,7 @@ export default function Layout() {
     return () => {
       isMounted = false;
     };
-  }, [logout, navigate, setUser, user]);
+  }, [logout, navigate, refreshLevelState]);
 
   useEffect(() => {
     return () => {
@@ -215,113 +224,6 @@ export default function Layout() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (levelSixPreviewKind !== 'pdf') {
-      return;
-    }
-
-    const updateWidth = () => {
-      const viewportWidth = window.innerWidth;
-      const containerWidth = levelSixPdfContainerRef.current?.clientWidth;
-      const nextWidth = getPdfPreviewWidth(viewportWidth, assistantOpen, containerWidth);
-      setLevelSixPdfRenderWidth(nextWidth);
-    };
-
-    updateWidth();
-
-    const container = levelSixPdfContainerRef.current;
-    if (!container) {
-      window.addEventListener('resize', updateWidth);
-
-      return () => {
-        window.removeEventListener('resize', updateWidth);
-      };
-    }
-
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(container);
-    window.addEventListener('resize', updateWidth);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateWidth);
-    };
-  }, [assistantOpen, levelSixPreviewKind]);
-
-  useEffect(() => {
-    if (!levelSixFile) {
-      setLevelSixPreviewKind(null);
-      setLevelSixPdfPages(0);
-      setLevelSixPreviewText('');
-      setLevelSixPreviewUrl(null);
-      return;
-    }
-
-    let isMounted = true;
-    let objectUrl: string | null = null;
-    const extension = levelSixFile.name.split('.').pop()?.toLowerCase() ?? '';
-
-    const loadPreview = async () => {
-      if (['txt', 'md', 'rtf'].includes(extension) || levelSixFile.type.startsWith('text/')) {
-        const text = await levelSixFile.text();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setLevelSixPreviewKind('text');
-        setLevelSixPdfPages(0);
-        setLevelSixPreviewText(text);
-        setLevelSixPreviewUrl(null);
-        return;
-      }
-
-      if (extension === 'pdf' || levelSixFile.type === 'application/pdf') {
-        objectUrl = URL.createObjectURL(levelSixFile);
-
-        if (!isMounted) {
-          return;
-        }
-
-        setLevelSixPreviewKind('pdf');
-        setLevelSixPdfPages(0);
-        setLevelSixPdfRenderWidth(getPdfPreviewWidth(window.innerWidth, assistantOpen));
-        setLevelSixPreviewText('');
-        setLevelSixPreviewUrl(objectUrl);
-        return;
-      }
-
-      objectUrl = URL.createObjectURL(levelSixFile);
-
-      if (!isMounted) {
-        return;
-      }
-
-      setLevelSixPreviewKind('document');
-      setLevelSixPdfPages(0);
-      setLevelSixPreviewText('');
-      setLevelSixPreviewUrl(objectUrl);
-    };
-
-    loadPreview().catch(() => {
-      if (!isMounted) {
-        return;
-      }
-
-      setLevelSixPreviewKind('document');
-      setLevelSixPdfPages(0);
-      setLevelSixPreviewText('');
-      setLevelSixPreviewUrl(null);
-    });
-
-    return () => {
-      isMounted = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [levelSixFile]);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -356,17 +258,15 @@ export default function Layout() {
     setLevelLoading(true);
 
     try {
-      const response =
-        action === 'reset'
-          ? await authService.resetLevel()
-          : await authService.progressLevel();
+      const previousLevel = furthestUnlockedLevel;
+      if (action === 'reset') {
+        await authService.resetLevel();
+      } else {
+        await authService.progressLevel();
+      }
+      const refreshedState = await refreshLevelState();
 
-      const previousLevel = unlockedLevel;
-      setUser(response.user);
-      setUnlockedLevel(response.user.current_level);
-      setActiveLevel(response.user.current_level);
-
-      if (action === 'progress' && response.user.current_level > previousLevel) {
+      if (action === 'progress' && refreshedState.unlockedLevel > previousLevel) {
         setShowLevelUp(true);
         if (levelUpTimeoutRef.current !== null) {
           window.clearTimeout(levelUpTimeoutRef.current);
@@ -378,6 +278,19 @@ export default function Layout() {
       }
     } finally {
       setLevelLoading(false);
+    }
+  };
+
+  const handleLevelSelect = async (level: number) => {
+    if (levelLoading) {
+      return;
+    }
+
+    try {
+      await refreshLevelState(level);
+    } catch {
+      logout();
+      navigate('/');
     }
   };
 
@@ -405,10 +318,6 @@ export default function Layout() {
     setLevelSixFile(null);
     setLevelSixCorrecting(false);
     setLevelSixDragging(false);
-    setLevelSixPreviewKind(null);
-    setLevelSixPdfPages(0);
-    setLevelSixPreviewText('');
-    setLevelSixPreviewUrl(null);
 
     if (levelSixFileInputRef.current) {
       levelSixFileInputRef.current.value = '';
@@ -514,16 +423,16 @@ export default function Layout() {
           >
             Reset Level
           </button>
-          {activeLevel !== 7 && (
+          {completedStages.length < levels.length && (
             <button
               type="button"
               onClick={() => updateLevel('progress')}
               disabled={levelLoading}
               className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Progress Level
-              </button>
-            )}
+            >
+              Progress Level
+            </button>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
@@ -577,21 +486,21 @@ export default function Layout() {
                 <div
                   className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
                   style={{
-                    width: `calc((100% - 3rem) * ${Math.max(0, (unlockedLevel - 1) / (levels.length - 1))})`,
+                    width: `calc((100% - 3rem) * ${Math.max(0, (furthestUnlockedLevel - 1) / (levels.length - 1))})`,
                   }}
                 />
 
                 <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
-                    const isUnlocked = isUnlockedFn(level);
+                    const isUnlocked = isLevelUnlocked(level, completedStages);
                     const isCompleted = completedStages.includes(level);
 
                     return (
                       <button
                         key={level}
                         type="button"
-                        onClick={() => isUnlocked && setActiveLevel(level)}
+                        onClick={() => isUnlocked && void handleLevelSelect(level)}
                         disabled={!isUnlocked}
                         className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
                           isCompleted
@@ -631,84 +540,13 @@ export default function Layout() {
               {activeLevel === 2 && <Level2 />}
               {activeLevel === 6 && (
                 levelSixCorrecting ? (
-                  <div className="flex h-full w-full flex-col rounded-md bg-neutral-100 px-5 py-5 text-neutral-900">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">
-                          Review
-                        </p>
-                        {levelSixFile && (
-                          <p className="mt-2 text-lg font-medium text-neutral-700">
-                            {levelSixFile.name}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={resetLevelSixFileState}
-                        className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50"
-                      >
-                        Change Document
-                      </button>
-                    </div>
-
-                    <div className="mt-5 min-h-0 flex-1 rounded-md bg-white">
-                      {levelSixPreviewKind === 'text' ? (
-                        <div className="h-full overflow-y-auto px-6 py-6">
-                          <div className="w-full whitespace-pre-wrap text-left text-base leading-8 text-neutral-700">
-                            {levelSixPreviewText}
-                          </div>
-                        </div>
-                      ) : levelSixPreviewKind === 'pdf' && levelSixPreviewUrl ? (
-                        <div
-                          ref={levelSixPdfContainerRef}
-                          className="h-full overflow-x-hidden overflow-y-auto bg-neutral-100 px-4 py-8 sm:px-6"
-                        >
-                          <div className="flex w-full flex-col items-center gap-8">
-                            <Document
-                              file={levelSixPreviewUrl}
-                              loading={
-                                <div className="flex min-h-[16rem] items-center justify-center rounded-[1.5rem] bg-white text-sm text-neutral-500">
-                                  Loading PDF...
-                                </div>
-                              }
-                              error={
-                                <div className="flex min-h-[16rem] items-center justify-center rounded-[1.5rem] bg-white px-6 text-center text-sm text-neutral-500">
-                                  This PDF could not be rendered in the review panel.
-                                </div>
-                              }
-                              onLoadSuccess={({ numPages }) => setLevelSixPdfPages(numPages)}
-                            >
-                              {Array.from({ length: levelSixPdfPages }, (_, index) => (
-                                <div key={`pdf-page-${index + 1}`} className="w-full max-w-full">
-                                  <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-[0_20px_45px_-30px_rgba(23,23,23,0.28)]">
-                                    <Page
-                                      pageNumber={index + 1}
-                                      width={levelSixPdfRenderWidth}
-                                      renderAnnotationLayer={false}
-                                      renderTextLayer={false}
-                                      className="mx-auto"
-                                    />
-                                  </div>
-                                  {index < levelSixPdfPages - 1 && <div className="h-[10px]" />}
-                                </div>
-                              ))}
-                            </Document>
-                          </div>
-                        </div>
-                      ) : levelSixPreviewUrl ? (
-                        <iframe
-                          src={levelSixPreviewUrl}
-                          title="Uploaded document preview"
-                          className="h-full w-full rounded-md bg-white"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-neutral-500">
-                          This document preview is not available in-browser yet, but the file is loaded and ready to swap.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  levelSixFile ? (
+                    <DocumentReview
+                      file={levelSixFile}
+                      onChangeDocument={resetLevelSixFileState}
+                      assistantOpen={assistantOpen}
+                    />
+                  ) : null
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-5">
                     <div className="w-full text-left">

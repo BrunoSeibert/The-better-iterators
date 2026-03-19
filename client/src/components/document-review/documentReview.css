@@ -1,0 +1,57 @@
+.document-review-shell {
+  height: 100%;
+  width: 100%;
+}
+
+.document-review-error {
+  border: 2px solid rgba(248, 113, 113, 0.9);
+  background: rgba(254, 226, 226, 0.92);
+  color: rgb(127, 29, 29);
+}
+
+.document-review-pdf .react-pdf__Document {
+  width: 100%;
+}
+
+.document-review-pdf-page {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.document-review-pdf-page .react-pdf__Page__canvas {
+  display: block;
+  margin: 0;
+  height: auto !important;
+  max-width: 100%;
+}
+
+.document-review-pdf-page .react-pdf__Page__textContent {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+  transform-origin: top left;
+  user-select: text;
+}
+
+.document-review-pdf-page .react-pdf__Page__textContent span,
+.document-review-pdf-page .react-pdf__Page__textContent br {
+  transform-origin: top left;
+}
+
+.document-review-pdf-page .react-pdf__Page__textContent [data-review-highlight='true'] {
+  mix-blend-mode: multiply;
+}
+
+.document-review-docx {
+  min-height: 100%;
+  width: 100%;
+}
+
+.document-review-docx .docx {
+  margin: 0 auto;
+  box-shadow: none;
+}
