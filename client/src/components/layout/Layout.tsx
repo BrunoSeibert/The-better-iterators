@@ -96,6 +96,7 @@ export default function Layout() {
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
   const prevUnlockedRef = useRef<Set<string>>(new Set());
+  const isInitializedRef = useRef(false); 
 
   const refreshLevelState = useCallback(
     async (requestedActiveLevel?: number) => {
@@ -113,6 +114,22 @@ export default function Layout() {
 
       setUser(refreshedUser);
       setActiveLevel(nextActiveLevel);
+
+      if (!isInitializedRef.current) {
+        const level = refreshedUser.currentLevel ?? 0;
+        let streak = 0;
+        try {
+          const summary = await authService.getStreakSummary();
+          streak = summary.currentStreak;
+        } catch {
+          streak = 0;
+        }
+        prevUnlockedRef.current = new Set(
+          BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
+        );
+        isInitializedRef.current = true;
+    }
+
 
       return {
         user: refreshedUser,
@@ -260,6 +277,8 @@ export default function Layout() {
   const level = user?.currentLevel ?? 0;
 
   useEffect(() => {
+    if (!isInitializedRef.current) return;
+    
     const newlyUnlocked = BADGES.filter((badge) => {
       const isUnlocked = badge.condition(dailyStreak, level);
       const wasUnlocked = prevUnlockedRef.current.has(badge.label);
