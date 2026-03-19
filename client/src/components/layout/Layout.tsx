@@ -1,4 +1,6 @@
 import {
+  type ChangeEvent,
+  type DragEvent,
   useEffect,
   useRef,
   useState,
@@ -6,13 +8,32 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import { Document, Page, pdfjs } from 'react-pdf';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import AiAssistant from '../chat/AiAssistant';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
 
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+
 const levels = Array.from({ length: 7 }, (_, index) => index + 1);
+const topbarHeight = 'max(10vh, 72px)';
+const assistantPanelWidth = 'clamp(320px, 32vw, 380px)';
+const getAssistantPanelPixels = (viewportWidth: number) =>
+  Math.min(380, Math.max(320, viewportWidth * 0.32));
+const getPdfPreviewWidth = (
+  viewportWidth: number,
+  isAssistantOpen: boolean,
+  containerWidth?: number
+) => {
+  const fallbackWidth =
+    viewportWidth - (isAssistantOpen ? getAssistantPanelPixels(viewportWidth) : 0) - 176;
+  const availableWidth = containerWidth ?? fallbackWidth;
+
+  return Math.max(220, Math.min(760, Math.floor(availableWidth - 96)));
+};
 
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
@@ -24,8 +45,22 @@ export default function Layout() {
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [dailyStreak, setDailyStreak] = useState(0);
+  const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
+  const [levelSixDragging, setLevelSixDragging] = useState(false);
+  const [levelSixCorrecting, setLevelSixCorrecting] = useState(false);
+  const [levelSixPreviewKind, setLevelSixPreviewKind] = useState<
+    'text' | 'pdf' | 'document' | null
+  >(null);
+  const [levelSixPdfPages, setLevelSixPdfPages] = useState(0);
+  const [levelSixPdfRenderWidth, setLevelSixPdfRenderWidth] = useState(() =>
+    typeof window === 'undefined' ? 220 : getPdfPreviewWidth(window.innerWidth, true)
+  );
+  const [levelSixPreviewText, setLevelSixPreviewText] = useState('');
+  const [levelSixPreviewUrl, setLevelSixPreviewUrl] = useState<string | null>(null);
   const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
+  const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
+  const levelSixPdfContainerRef = useRef<HTMLDivElement | null>(null);
   const levelUpTimeoutRef = useRef<number | null>(null);
   const dragState = useRef({
     isDragging: false,
@@ -151,6 +186,113 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    if (levelSixPreviewKind !== 'pdf') {
+      return;
+    }
+
+    const updateWidth = () => {
+      const viewportWidth = window.innerWidth;
+      const containerWidth = levelSixPdfContainerRef.current?.clientWidth;
+      const nextWidth = getPdfPreviewWidth(viewportWidth, assistantOpen, containerWidth);
+      setLevelSixPdfRenderWidth(nextWidth);
+    };
+
+    updateWidth();
+
+    const container = levelSixPdfContainerRef.current;
+    if (!container) {
+      window.addEventListener('resize', updateWidth);
+
+      return () => {
+        window.removeEventListener('resize', updateWidth);
+      };
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+    window.addEventListener('resize', updateWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [assistantOpen, levelSixPreviewKind]);
+
+  useEffect(() => {
+    if (!levelSixFile) {
+      setLevelSixPreviewKind(null);
+      setLevelSixPdfPages(0);
+      setLevelSixPreviewText('');
+      setLevelSixPreviewUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    let objectUrl: string | null = null;
+    const extension = levelSixFile.name.split('.').pop()?.toLowerCase() ?? '';
+
+    const loadPreview = async () => {
+      if (['txt', 'md', 'rtf'].includes(extension) || levelSixFile.type.startsWith('text/')) {
+        const text = await levelSixFile.text();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setLevelSixPreviewKind('text');
+        setLevelSixPdfPages(0);
+        setLevelSixPreviewText(text);
+        setLevelSixPreviewUrl(null);
+        return;
+      }
+
+      if (extension === 'pdf' || levelSixFile.type === 'application/pdf') {
+        objectUrl = URL.createObjectURL(levelSixFile);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setLevelSixPreviewKind('pdf');
+        setLevelSixPdfPages(0);
+        setLevelSixPdfRenderWidth(getPdfPreviewWidth(window.innerWidth, assistantOpen));
+        setLevelSixPreviewText('');
+        setLevelSixPreviewUrl(objectUrl);
+        return;
+      }
+
+      objectUrl = URL.createObjectURL(levelSixFile);
+
+      if (!isMounted) {
+        return;
+      }
+
+      setLevelSixPreviewKind('document');
+      setLevelSixPdfPages(0);
+      setLevelSixPreviewText('');
+      setLevelSixPreviewUrl(objectUrl);
+    };
+
+    loadPreview().catch(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      setLevelSixPreviewKind('document');
+      setLevelSixPdfPages(0);
+      setLevelSixPreviewText('');
+      setLevelSixPreviewUrl(null);
+    });
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [levelSixFile]);
+
+  useEffect(() => {
     if (!localStorage.getItem('token')) {
       return;
     }
@@ -208,6 +350,40 @@ export default function Layout() {
     }
   };
 
+  const handleLevelSixFile = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setLevelSixFile(file);
+    setLevelSixCorrecting(false);
+    setLevelSixDragging(false);
+  };
+
+  const handleLevelSixFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    handleLevelSixFile(event.target.files?.[0] ?? null);
+  };
+
+  const handleLevelSixDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setLevelSixDragging(false);
+    handleLevelSixFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
+  const resetLevelSixFileState = () => {
+    setLevelSixFile(null);
+    setLevelSixCorrecting(false);
+    setLevelSixDragging(false);
+    setLevelSixPreviewKind(null);
+    setLevelSixPdfPages(0);
+    setLevelSixPreviewText('');
+    setLevelSixPreviewUrl(null);
+
+    if (levelSixFileInputRef.current) {
+      levelSixFileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
       {showLevelUp && (
@@ -217,7 +393,7 @@ export default function Layout() {
           </span>
         </div>
       )}
-      <header className="flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
         <img
           src={studyonLogo}
           alt="Studyon logo"
@@ -232,7 +408,25 @@ export default function Layout() {
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
           <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
         </button>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => updateLevel('reset')}
+            disabled={levelLoading}
+            className="rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset Level
+          </button>
+          {activeLevel !== 7 && (
+            <button
+              type="button"
+              onClick={() => updateLevel('progress')}
+              disabled={levelLoading}
+              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Progress Level
+            </button>
+          )}
           <button
             type="button"
             onClick={() => { logout(); navigate('/login'); }}
@@ -244,8 +438,11 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="flex min-h-[90vh]">
-        <section className="flex min-w-0 flex-1 flex-col">
+      <main
+        className="min-h-screen pt-[max(10vh,72px)] transition-[padding-right] duration-200"
+        style={{ paddingRight: assistantOpen ? assistantPanelWidth : '0px' }}
+      >
+        <section className="flex min-h-[calc(100vh-max(10vh,72px))] min-w-0 flex-col">
           <div className="flex h-[10vh] min-h-[88px] items-center border-b border-neutral-300 bg-neutral-100 px-4 sm:px-6 lg:px-8">
             <div
               ref={roadmapRef}
@@ -310,86 +507,202 @@ export default function Layout() {
             </div>
           </div>
 
-          <div className="flex-1 bg-white px-8 py-8">
-            <div className="flex h-full min-h-[320px] flex-col rounded-[2.5rem] bg-neutral-200/70 px-8 py-8">
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => updateLevel('reset')}
-                  disabled={levelLoading}
-                  className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Reset Level
-                </button>
-                {activeLevel !== 7 && (
-                  <button
-                    type="button"
-                    onClick={() => updateLevel('progress')}
-                    disabled={levelLoading}
-                    className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Progress Level
-                  </button>
-                )}
-              </div>
+          <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
+            <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
+              {activeLevel === 6 && (
+                levelSixCorrecting ? (
+                  <div className="flex h-full w-full flex-col rounded-md bg-neutral-100 px-5 py-5 text-neutral-900">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-400">
+                          Review
+                        </p>
+                        {levelSixFile && (
+                          <p className="mt-2 text-lg font-medium text-neutral-700">
+                            {levelSixFile.name}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={resetLevelSixFileState}
+                        className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50"
+                      >
+                        Change Document
+                      </button>
+                    </div>
 
-              <div className="flex flex-1 items-center justify-center">
-                <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">
-                  {activeLevel}
-                </p>
-              </div>
+                    <div className="mt-5 min-h-0 flex-1 rounded-md bg-white">
+                      {levelSixPreviewKind === 'text' ? (
+                        <div className="h-full overflow-y-auto px-6 py-6">
+                          <div className="w-full whitespace-pre-wrap text-left text-base leading-8 text-neutral-700">
+                            {levelSixPreviewText}
+                          </div>
+                        </div>
+                      ) : levelSixPreviewKind === 'pdf' && levelSixPreviewUrl ? (
+                        <div
+                          ref={levelSixPdfContainerRef}
+                          className="h-full overflow-x-hidden overflow-y-auto bg-neutral-100 px-4 py-8 sm:px-6"
+                        >
+                          <div className="flex w-full flex-col items-center gap-8">
+                            <Document
+                              file={levelSixPreviewUrl}
+                              loading={
+                                <div className="flex min-h-[16rem] items-center justify-center rounded-[1.5rem] bg-white text-sm text-neutral-500">
+                                  Loading PDF...
+                                </div>
+                              }
+                              error={
+                                <div className="flex min-h-[16rem] items-center justify-center rounded-[1.5rem] bg-white px-6 text-center text-sm text-neutral-500">
+                                  This PDF could not be rendered in the review panel.
+                                </div>
+                              }
+                              onLoadSuccess={({ numPages }) => setLevelSixPdfPages(numPages)}
+                            >
+                              {Array.from({ length: levelSixPdfPages }, (_, index) => (
+                                <div key={`pdf-page-${index + 1}`} className="w-full max-w-full">
+                                  <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-[0_20px_45px_-30px_rgba(23,23,23,0.28)]">
+                                    <Page
+                                      pageNumber={index + 1}
+                                      width={levelSixPdfRenderWidth}
+                                      renderAnnotationLayer={false}
+                                      renderTextLayer={false}
+                                      className="mx-auto"
+                                    />
+                                  </div>
+                                  {index < levelSixPdfPages - 1 && <div className="h-[10px]" />}
+                                </div>
+                              ))}
+                            </Document>
+                          </div>
+                        </div>
+                      ) : levelSixPreviewUrl ? (
+                        <iframe
+                          src={levelSixPreviewUrl}
+                          title="Uploaded document preview"
+                          className="h-full w-full rounded-md bg-white"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-neutral-500">
+                          This document preview is not available in-browser yet, but the file is loaded and ready to swap.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+                    <div className="w-full text-left">
+                      <h2 className="text-3xl font-semibold text-neutral-800">Writing</h2>
+                      <p className="mt-1 text-sm text-neutral-500">Get Feedback from our Badger AI</p>
+                    </div>
+                    <label
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setLevelSixDragging(true);
+                      }}
+                      onDragLeave={() => setLevelSixDragging(false)}
+                      onDrop={handleLevelSixDrop}
+                      className={`group flex h-[80%] w-full cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-6 text-center transition ${
+                        levelSixDragging
+                          ? 'border-neutral-600 bg-neutral-100'
+                          : 'border-neutral-300 bg-white'
+                      }`}
+                    >
+                      <input
+                        ref={levelSixFileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,.rtf"
+                        onChange={handleLevelSixFileChange}
+                        className="hidden"
+                      />
+                      <span className="text-lg font-medium text-neutral-700">
+                        Drag to insert file
+                      </span>
+                      <span className="mt-2 text-sm text-neutral-400">
+                        PDF, DOC, DOCX, TXT, RTF
+                      </span>
+                      <span className="mt-5 rounded-full border border-neutral-300 bg-neutral-50 px-5 py-2 text-sm font-medium text-neutral-600 transition group-hover:border-neutral-400 group-hover:bg-neutral-100">
+                        Choose file
+                      </span>
+                      {levelSixFile && (
+                        <span className="mt-4 rounded-full bg-neutral-100 px-4 py-2 text-sm text-neutral-700">
+                          {levelSixFile.name}
+                        </span>
+                      )}
+                    </label>
+                    {levelSixFile && (
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setLevelSixCorrecting(true)}
+                          className="rounded-full bg-neutral-900 px-10 py-4 text-base font-semibold text-white shadow-[0_18px_40px_-20px_rgba(23,23,23,0.95)] transition hover:bg-neutral-800"
+                        >
+                          Correct
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
             </div>
             <Outlet />
           </div>
         </section>
 
-        <div className="relative flex">
-          {!assistantOpen && (
-            <button
-              onClick={() => setAssistantOpen(true)}
-              className="absolute -left-12 top-1/2 z-10 -translate-y-1/2 overflow-hidden rounded-full shadow-lg hover:shadow-xl transition"
-              aria-label="Open AI Assistant"
-            >
+      </main>
+
+      {!assistantOpen && (
+        <button
+          onClick={() => setAssistantOpen(true)}
+          className="fixed right-4 top-[calc(max(10vh,72px)+50%)] z-20 -translate-y-1/2 overflow-hidden rounded-full shadow-lg transition hover:shadow-xl"
+          aria-label="Open AI Assistant"
+        >
+          <img
+            src={badgerImage}
+            alt="Badger"
+            className="h-20 w-20 object-cover"
+          />
+        </button>
+      )}
+
+      {assistantOpen && (
+        <aside
+          className="fixed right-0 z-20 border-l border-neutral-200 bg-white px-3 py-8 pl-4 text-neutral-900"
+          style={{
+            top: topbarHeight,
+            height: `calc(100vh - ${topbarHeight})`,
+            width: assistantPanelWidth,
+          }}
+        >
+          <div className="relative flex justify-center">
+            <div className="flex justify-center">
               <img
                 src={badgerImage}
                 alt="Badger"
-                className="h-20 w-20 object-cover"
+                className="h-24 w-24 rounded-full object-cover"
               />
+            </div>
+            <button
+              onClick={() => setAssistantOpen(false)}
+              className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              aria-label="Close AI Assistant"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
-          )}
-          {assistantOpen && (
-            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-3 pl-4 py-8 text-neutral-900 lg:w-[380px]">
-              <div className="relative flex justify-center">
-                <div className="flex justify-center">
-                  <img
-                    src={badgerImage}
-                    alt="Badger"
-                    className="h-24 w-24 rounded-full object-cover"
-                  />
-                </div>
-                <button
-                  onClick={() => setAssistantOpen(false)}
-                  className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-                  aria-label="Close AI Assistant"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
-                    <path
-                      d="M6 6L18 18M18 6L6 18"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
-                <AiAssistant />
-              </div>
-            </aside>
-          )}
-        </div>
-      </main>
+          </div>
+          <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
+            <AiAssistant />
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
