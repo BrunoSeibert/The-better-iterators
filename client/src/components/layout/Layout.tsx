@@ -517,7 +517,19 @@ export default function Layout() {
         await authService.setLevelMetadata(level, value.trim());
       }
       setCompletionModal(null);
-      await applyLevelState(result.user);
+      const refreshedState = await applyLevelState(result.user);
+      setLevelUpNumber(refreshedState.unlockedLevel);
+      setLevelUpExiting(false);
+      setShowLevelUp(true);
+      if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
+      levelUpTimeoutRef.current = window.setTimeout(() => {
+        setLevelUpExiting(true);
+        window.setTimeout(() => {
+          setShowLevelUp(false);
+          setLevelUpExiting(false);
+          levelUpTimeoutRef.current = null;
+        }, 400);
+      }, 1500);
     } finally {
       setCompletionLoading(false);
     }
@@ -991,7 +1003,7 @@ const closeAssistant = () => {
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => { setCheckinDone(true); setCheckinOpen(false); }} />
+            <DailyCheckin onComplete={() => { setCheckinDone(true); }} />
           </div>
         </div>
       )}
