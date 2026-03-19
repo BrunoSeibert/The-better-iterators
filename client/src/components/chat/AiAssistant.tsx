@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuthStore } from '../../store/authStore';
@@ -7,10 +7,13 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { getLevelMetadata } from '@/services/authService';
 
+const IDLE_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_AFFIRMATIONS_PER_SESSION = 2;
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  isAffirmation?: boolean;
 }
 
 export default function AiAssistant() {
@@ -22,14 +25,65 @@ export default function AiAssistant() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastUserMessageAt = useRef<number>(Date.now());
+  const affirmationCount = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
+  const getCheckinContext = () => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return undefined;
+      const c = JSON.parse(raw);
+      if (new Date(c.date).toDateString() !== new Date().toDateString()) return undefined;
+      const energyLabel = ['', 'exhausted', 'tired', 'okay', 'good', 'energized'][c.energy] ?? '';
+      return [
+        `Energy: ${c.energy}/5 (${energyLabel})`,
+        c.lastProgress ? `Last worked on: ${c.lastProgress}` : null,
+        `Today's focus: ${c.focus}`,
+        c.timeAvailable ? `Time available: ${c.timeAvailable}` : null,
+        c.blocker ? `Blocker: ${c.blocker}` : null,
+      ].filter(Boolean).join('\n');
+    } catch { return undefined; }
+  };
+
+  const fetchAffirmation = useCallback(async () => {
+    if (loading || affirmationCount.current >= MAX_AFFIRMATIONS_PER_SESSION) return;
+    affirmationCount.current += 1;
+
+    try {
+      const checkinContext = getCheckinContext();
+      const res = await fetch('/api/affirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ checkinContext }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.content) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.content, isAffirmation: true }]);
+      }
+    } catch { /* silently skip */ }
+  }, [loading, token]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const idleMs = Date.now() - lastUserMessageAt.current;
+      if (idleMs >= IDLE_MS) {
+        fetchAffirmation();
+        lastUserMessageAt.current = Date.now();
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchAffirmation]);
+
   async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
+
+    lastUserMessageAt.current = Date.now();
 
     const newMessages: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
@@ -37,23 +91,7 @@ export default function AiAssistant() {
     setLoading(true);
 
     try {
-      const checkinContext = (() => {
-        try {
-          const raw = localStorage.getItem('todayCheckin');
-          if (!raw) return undefined;
-          const c = JSON.parse(raw);
-          const today = new Date().toDateString();
-          if (new Date(c.date).toDateString() !== today) return undefined;
-          const energyLabel = ['', 'exhausted', 'tired', 'okay', 'good', 'energized'][c.energy] ?? '';
-          return [
-            `Energy: ${c.energy}/5 (${energyLabel})`,
-            c.lastProgress ? `Last worked on: ${c.lastProgress}` : null,
-            `Today's focus: ${c.focus}`,
-            c.timeAvailable ? `Time available: ${c.timeAvailable}` : null,
-            c.blocker ? `Blocker: ${c.blocker}` : null,
-          ].filter(Boolean).join('\n');
-        } catch { return undefined; }
-      })();
+      const checkinContext = getCheckinContext();
 
       const thesisMeta: Record<string, string> = await getLevelMetadata().catch(() => ({}));
       const thesisContext = [
@@ -69,7 +107,7 @@ export default function AiAssistant() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          messages: newMessages,
+          messages: newMessages.map(({ role, content }) => ({ role, content })),
           conversationId,
           checkinContext,
           thesisContext,
@@ -78,7 +116,7 @@ export default function AiAssistant() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       if (data.conversationId) setConversationId(data.conversationId);
-      setMessages([...newMessages, data.message]);
+      setMessages([...newMessages, { ...data.message, isAffirmation: false }]);
     } catch {
       setMessages([...newMessages, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
     } finally {
@@ -98,20 +136,25 @@ export default function AiAssistant() {
               className={`max-w-[85%] rounded-[0.42rem] px-3 py-2 ${
                 msg.role === 'user'
                   ? 'bg-[rgba(114,96,84,1)] text-[rgba(245,239,231,1)]'
-                  : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+                  : msg.isAffirmation
+                    ? 'border border-amber-200 bg-amber-50 text-neutral-700'
+                    : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
               }`}
             >
+              {msg.isAffirmation && (
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-500">✦ Noodle</p>
+              )}
               {msg.role === 'user' ? (
                 msg.content
               ) : (
-              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                >
-                  {msg.content}
-                </ReactMarkdown>
-              </div>
+                <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
               )}
             </div>
           </div>
@@ -146,4 +189,3 @@ export default function AiAssistant() {
     </div>
   );
 }
-
