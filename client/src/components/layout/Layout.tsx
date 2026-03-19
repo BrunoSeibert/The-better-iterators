@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -9,16 +10,23 @@ import AiAssistant from '../chat/AiAssistant';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
+import * as authService from '@/services/authService';
 
-const levels = Array.from({ length: 8 }, (_, index) => index + 1);
-const unlockedLevel = 5;
+const levels = Array.from({ length: 7 }, (_, index) => index + 1);
 
 export default function Layout() {
-  const [activeLevel, setActiveLevel] = useState(1);
-  const [assistantOpen, setAssistantOpen] = useState(true);
-  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
+  const [activeLevel, setActiveLevel] = useState(() => user?.current_level ?? 1);
+  const [unlockedLevel, setUnlockedLevel] = useState(() => user?.current_level ?? 1);
+  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [levelLoading, setLevelLoading] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
+  const levelUpTimeoutRef = useRef<number | null>(null);
   const dragState = useRef({
     isDragging: false,
     startX: 0,
@@ -91,8 +99,124 @@ export default function Layout() {
     }
   };
 
+  useEffect(() => {
+    if (!user?.current_level) {
+      return;
+    }
+
+    setUnlockedLevel(user.current_level);
+    setActiveLevel((currentActiveLevel) =>
+      currentActiveLevel > user.current_level ? user.current_level : currentActiveLevel
+    );
+  }, [user?.current_level]);
+
+  useEffect(() => {
+    if ((user && typeof user.current_level === 'number') || !localStorage.getItem('token')) {
+      return;
+    }
+
+    let isMounted = true;
+
+    authService
+      .me()
+      .then(({ user: fetchedUser }) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setUser(fetchedUser);
+        setUnlockedLevel(fetchedUser.current_level);
+        setActiveLevel(fetchedUser.current_level);
+      })
+      .catch(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        logout();
+        navigate('/');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [logout, navigate, setUser, user]);
+
+  useEffect(() => {
+    return () => {
+      if (levelUpTimeoutRef.current !== null) {
+        window.clearTimeout(levelUpTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) {
+      return;
+    }
+
+    let isMounted = true;
+
+    authService
+      .getStreakSummary()
+      .then((summary) => {
+        if (isMounted) {
+          setDailyStreak(summary.currentStreak);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setDailyStreak(0);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updateLevel = async (action: 'reset' | 'progress') => {
+    if (levelLoading) {
+      return;
+    }
+
+    setLevelLoading(true);
+
+    try {
+      const response =
+        action === 'reset'
+          ? await authService.resetLevel()
+          : await authService.progressLevel();
+
+      const previousLevel = unlockedLevel;
+      setUser(response.user);
+      setUnlockedLevel(response.user.current_level);
+      setActiveLevel(response.user.current_level);
+
+      if (action === 'progress' && response.user.current_level > previousLevel) {
+        setShowLevelUp(true);
+        if (levelUpTimeoutRef.current !== null) {
+          window.clearTimeout(levelUpTimeoutRef.current);
+        }
+        levelUpTimeoutRef.current = window.setTimeout(() => {
+          setShowLevelUp(false);
+          levelUpTimeoutRef.current = null;
+        }, 500);
+      }
+    } finally {
+      setLevelLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
+      {showLevelUp && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-yellow-300/85">
+          <span className="text-5xl font-bold uppercase tracking-[0.3em] text-neutral-950">
+            Level up
+          </span>
+        </div>
+      )}
       <header className="flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
         <img
           src={studyonLogo}
@@ -105,10 +229,8 @@ export default function Layout() {
           className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
           aria-label="Open streak page"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 fill-current">
-            <path d="M13.09 2.91c.42 2.37-.54 3.98-1.47 5.53-.86 1.44-1.68 2.8-1.24 4.72.2.85.71 1.67 1.44 2.31-.13-1.7.61-2.9 1.37-4.11.92-1.46 1.87-2.98 1.5-5.28 2.52 1.77 4.31 4.75 4.31 7.92A7 7 0 1 1 7 11.9c.25-1.73 1.2-3.3 2.58-4.37-.27 2.03.34 3.27 1.04 4.18.06-1.92 1-3.48 1.9-4.98.98-1.63 1.91-3.18 1.57-5.82Z" />
-          </svg>
-          <span className="text-xl font-semibold text-orange-400">1</span>
+          <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
+          <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
         </button>
         <div className="ml-auto">
           <button
@@ -140,7 +262,7 @@ export default function Layout() {
                 <div
                   className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
                   style={{
-                    width: `calc(${((unlockedLevel - 1) / (levels.length - 1)) * 100}% - 3rem)`,
+                    width: `calc((100% - 3rem) * ${Math.max(0, (unlockedLevel - 1) / (levels.length - 1))})`,
                   }}
                 />
 
@@ -155,7 +277,7 @@ export default function Layout() {
                         type="button"
                         onClick={() => isUnlocked && setActiveLevel(level)}
                         disabled={!isUnlocked}
-                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold shadow-[0_0_0_6px_rgba(245,245,245,0.95)] transition ${
+                        className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
                           isUnlocked
                             ? isActive
                               ? 'border-neutral-800 bg-neutral-800 text-white'
@@ -189,10 +311,33 @@ export default function Layout() {
           </div>
 
           <div className="flex-1 bg-white px-8 py-8">
-            <div className="flex h-full min-h-[320px] items-center justify-center rounded-[2.5rem] bg-neutral-200/70">
-              <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">
-                {activeLevel}
-              </p>
+            <div className="flex h-full min-h-[320px] flex-col rounded-[2.5rem] bg-neutral-200/70 px-8 py-8">
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateLevel('reset')}
+                  disabled={levelLoading}
+                  className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Reset Level
+                </button>
+                {activeLevel !== 7 && (
+                  <button
+                    type="button"
+                    onClick={() => updateLevel('progress')}
+                    disabled={levelLoading}
+                    className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Progress Level
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-1 items-center justify-center">
+                <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">
+                  {activeLevel}
+                </p>
+              </div>
             </div>
             <Outlet />
           </div>
@@ -220,10 +365,18 @@ export default function Layout() {
                 </div>
                 <button
                   onClick={() => setAssistantOpen(false)}
-                  className="absolute right-0 top-0 rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                  className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 shadow-sm transition hover:bg-neutral-200 hover:text-neutral-800"
                   aria-label="Close AI Assistant"
                 >
-                  x
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
+                    <path
+                      d="M6 6L18 18M18 6L6 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
               <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
@@ -236,3 +389,4 @@ export default function Layout() {
     </div>
   );
 }
+
