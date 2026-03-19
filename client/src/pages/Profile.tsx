@@ -5,14 +5,14 @@ import * as authService from '@/services/authService';
 import { BADGES } from '@/utils/badges';
 
 const C = {
-  darkBrown:  'rgba(81,60,45,1)',
-  midBrown:   'rgba(114,96,84,1)',
-  tan:        'rgba(197,171,146,1)',
-  lightTan:   'rgba(231,214,194,1)',
-  cream:      'rgba(252,248,243,1)',
-  warmWhite:  'rgba(245,239,231,1)',
-  border:     'rgba(196,177,160,1)',
-  mutedText:  'rgba(140,115,95,1)',
+  darkBrown:  'rgba(38,38,38,1)',
+  midBrown:   'rgba(82,82,91,1)',
+  tan:        'rgba(161,161,170,1)',
+  lightTan:   'rgba(228,228,231,1)',
+  cream:      'rgba(250,250,250,1)',
+  warmWhite:  'rgba(244,244,245,1)',
+  border:     'rgba(212,212,216,1)',
+  mutedText:  'rgba(113,113,122,1)',
 };
 
 export default function Profile() {
@@ -50,7 +50,7 @@ export default function Profile() {
         type="button"
         onClick={() => navigate(returnTo)}
         className="mb-8 flex items-center gap-2 px-4 py-2 text-sm font-medium transition rounded-lg"
-        style={{ color: C.mutedText, backgroundColor: C.lightTan, border: `1px solid ${C.border}` }}
+        style={{ color: C.darkBrown, backgroundColor: C.lightTan, border: '2px solid rgba(224,224,228,1)' }}
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
           <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
@@ -61,11 +61,11 @@ export default function Profile() {
       <div className="mx-auto max-w-2xl space-y-5">
 
         {/* Header card */}
-        <div className="rounded-xl px-8 py-8" style={{ backgroundColor: C.darkBrown, border: `1px solid rgba(56,40,29,1)` }}>
+        <div className="rounded-xl px-8 py-8" style={{ backgroundColor: 'rgba(122,95,76,1)', border: '2px solid rgba(84,61,46,1)' }}>
           <div className="flex items-center gap-5">
             <div
               className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl text-3xl font-bold"
-              style={{ backgroundColor: 'rgba(106,80,61,1)', color: C.cream }}
+              style={{ backgroundColor: 'rgba(153,125,105,1)', color: C.cream }}
             >
               {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?'}
             </div>
@@ -82,7 +82,7 @@ export default function Profile() {
               <span>Progress</span>
               <span>{completedStages.length} / 6 stages</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(124,95,73,1)' }}>
+            <div className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(157,131,112,1)' }}>
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${(completedStages.length / 6) * 100}%`, backgroundColor: C.lightTan }}
@@ -92,12 +92,12 @@ export default function Profile() {
         </div>
 
         {/* Badges card */}
-        <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: `1px solid ${C.border}` }}>
+        <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: '2px solid rgba(224,224,228,1)' }}>
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-base font-bold" style={{ color: C.darkBrown }}>Badges</h2>
             <span
               className="rounded-full px-3 py-1 text-xs font-semibold"
-              style={{ backgroundColor: C.lightTan, color: C.mutedText, border: `1px solid ${C.border}` }}
+              style={{ backgroundColor: C.lightTan, color: C.darkBrown, border: '2px solid rgba(224,224,228,1)' }}
             >
               {unlockedCount} / {BADGES.length} unlocked
             </span>
@@ -111,8 +111,8 @@ export default function Profile() {
                   <div
                     className="flex h-16 w-16 items-center justify-center rounded-xl text-3xl transition"
                     style={unlocked
-                      ? { backgroundColor: C.lightTan, border: `1px solid ${C.border}` }
-                      : { backgroundColor: C.warmWhite, border: `1px solid ${C.border}`, opacity: 0.4, filter: 'grayscale(1)' }
+                      ? { backgroundColor: C.lightTan, border: '2px solid rgba(224,224,228,1)' }
+                      : { backgroundColor: C.warmWhite, border: '2px solid rgba(224,224,228,1)', opacity: 0.4, filter: 'grayscale(1)' }
                     }
                   >
                     {badge.emoji}
@@ -132,7 +132,7 @@ export default function Profile() {
         </div>
 
         {/* Account card */}
-        <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: `1px solid ${C.border}` }}>
+        <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: '2px solid rgba(224,224,228,1)' }}>
           <h2 className="mb-5 text-base font-bold" style={{ color: C.darkBrown }}>Account</h2>
           <div className="space-y-2">
             {[
@@ -144,7 +144,7 @@ export default function Profile() {
               <div
                 key={label}
                 className="flex items-center justify-between rounded-lg px-5 py-3.5"
-                style={{ backgroundColor: C.warmWhite, border: `1px solid ${C.border}` }}
+                style={{ backgroundColor: 'rgba(255,255,255,1)', border: '2px solid rgba(224,224,228,1)' }}
               >
                 <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>{label}</span>
                 <span className="text-sm font-semibold" style={{ color: C.darkBrown }}>{value}</span>
@@ -158,7 +158,7 @@ export default function Profile() {
           type="button"
           onClick={() => { logout(); navigate('/login', { state: { returnTo } }); }}
           className="w-full rounded-lg py-3 text-sm font-bold transition"
-          style={{ backgroundColor: C.lightTan, color: C.darkBrown, border: `1px solid ${C.border}` }}
+          style={{ backgroundColor: 'rgba(220,38,38,0.5)', color: 'rgba(153,27,27,1)', border: '2px solid rgba(220,38,38,1)' }}
         >
           Log out
         </button>

@@ -129,6 +129,13 @@ export default function Layout() {
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [checkinDone, setCheckinDone] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return false;
+      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
+    } catch { return false; }
+  });
 
   const [checkinOpen, setCheckinOpen] = useState(() => {
     try {
@@ -468,6 +475,10 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
+  const handleCheckinButtonClick = () => {
+    setCheckinOpen(true);
+  };
+
 const closeAssistant = () => {
     const source = assistantBadgerRef.current?.getBoundingClientRect();
     const target = badgerButtonSlotRef.current?.getBoundingClientRect();
@@ -565,7 +576,7 @@ const closeAssistant = () => {
           </div>
         </div>
       )}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-neutral-800 px-4 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
@@ -617,6 +628,13 @@ const closeAssistant = () => {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
+        
+          <button
+            onClick={handleCheckinButtonClick}
+            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
+          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
@@ -911,7 +929,7 @@ const closeAssistant = () => {
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => {}} />
+            <DailyCheckin onComplete={() => { setCheckinDone(true); setCheckinOpen(false); }} />
           </div>
         </div>
       )}
