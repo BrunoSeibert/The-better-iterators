@@ -33,7 +33,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       [convId, 'USER', userMessage.content]
     );
 
-    // Fetch previous messages from other conversations for context
+    // Fetch previous messages for context
     const prevResult = await db.query(
       `SELECT m.role, m.content
        FROM "Message" m
@@ -49,15 +49,68 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       content: m.content,
     }));
 
-    const systemContext = previousMessages.length > 0
-      ? `You are a helpful thesis journey assistant. Here is the user's previous chat history for context:\n\n${previousMessages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
-      : 'You are a helpful thesis journey assistant.';
+    // ---- Fetch all 9 tables ----
+    const [
+      universities, studyPrograms, fields, companies,
+      students, supervisors, experts, topics, projects
+    ] = await Promise.all([
+      db.query('SELECT * FROM universities'),
+      db.query('SELECT * FROM study_programs'),
+      db.query('SELECT * FROM fields'),
+      db.query('SELECT * FROM companies'),
+      db.query('SELECT * FROM students'),
+      db.query('SELECT * FROM supervisors'),
+      db.query('SELECT * FROM experts'),
+      db.query('SELECT * FROM topics'),
+      db.query('SELECT * FROM projects'),
+    ]);
 
-    // Call OpenAI with previous context + current messages
+    const dbContext = `
+## Platform Data
+
+### Universities
+${JSON.stringify(universities.rows, null, 2)}
+
+### Study Programs
+${JSON.stringify(studyPrograms.rows, null, 2)}
+
+### Fields
+${JSON.stringify(fields.rows, null, 2)}
+
+### Companies
+${JSON.stringify(companies.rows, null, 2)}
+
+### Students
+${JSON.stringify(students.rows, null, 2)}
+
+### Supervisors
+${JSON.stringify(supervisors.rows, null, 2)}
+
+### Experts
+${JSON.stringify(experts.rows, null, 2)}
+
+### Topics
+${JSON.stringify(topics.rows, null, 2)}
+
+### Projects
+${JSON.stringify(projects.rows, null, 2)}
+`;
+
+    const previousContext = previousMessages.length > 0
+      ? `\n\n## Previous Chat History\n${previousMessages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
+      : '';
+
+    const systemPrompt = `You are StudyOnd's AI thesis assistant. Help students find thesis topics, supervisors, companies and experts that match their interests and goals.
+
+When making recommendations, always refer to specific names, titles and descriptions from the platform data below. Be specific and helpful.
+${dbContext}
+${previousContext}`;
+
+    // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: systemContext },
+        { role: 'system', content: systemPrompt },
         ...messages,
       ],
     });

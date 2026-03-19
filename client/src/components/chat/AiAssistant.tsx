@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuthStore } from '../../store/authStore';
 
 interface Message {
@@ -67,7 +69,15 @@ export default function AiAssistant() {
                   : 'border border-neutral-200 bg-neutral-50 text-neutral-700'
               }`}
             >
-              {msg.content}
+              {msg.role === 'user' ? (
+                msg.content
+              ) : (
+              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+              )}
             </div>
           </div>
         ))}
@@ -101,3 +111,4 @@ export default function AiAssistant() {
     </div>
   );
 }
+
