@@ -7,13 +7,12 @@ import mascotBackImage from '@/assets/dailycheckin-mascot-back.png';
 import mascotFrontImage from '@/assets/dailycheckin-mascot-front.png';
 
 const LEVEL_NAMES: Record<number, string> = {
-  1: 'Explore topics & literature review',
-  2: 'Find an advisor',
-  3: 'Research proposal',
-  4: 'Actual research',
+  1: 'Topic Selection',
+  2: 'Advisor Selection',
+  3: 'Research Proposal',
+  4: 'Research',
   5: 'Writing',
-  6: 'Defense',
-  7: 'Completed',
+  6: 'Defense Prep',
 };
 
 const UNLOCK_DEPS: Record<number, number[]> = {

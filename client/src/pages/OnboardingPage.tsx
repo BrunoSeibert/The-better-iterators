@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
 import * as authService from '../services/authService';
 import StudyondLogo from '../components/ui/StudyondLogo';
+import DatePicker from '../components/DatePicker';
 
 const C = {
   darkBrown:  'rgba(38,38,38,1)',
@@ -26,14 +27,12 @@ const DEGREE_OPTIONS = [
   { label: 'PhD', value: 'phd' },
 ];
 
-const THESIS_STAGES = [
-  { label: "I'm still looking for a topic",             getCompleted: (a: boolean) => a ? [2] : [] },
-  { label: "I have a topic, no literature review yet",  getCompleted: (a: boolean) => a ? [1, 2] : [1] },
-  { label: "I've done literature research, no proposal yet", getCompleted: (a: boolean) => a ? [1, 2, 3] : [1, 3] },
-  { label: "I'm writing my research proposal",          getCompleted: () => [1, 2, 3] },
-  { label: "I'm doing my actual research",              getCompleted: () => [1, 2, 3, 4] },
-  { label: "I'm writing my thesis",                     getCompleted: () => [1, 2, 3, 4, 5] },
-  { label: "I'm preparing for my defense",              getCompleted: () => [1, 2, 3, 4, 5, 6] },
+const THESIS_STAGES: { label: string; currentLevel: number; getCompleted: (hasAdvisor: boolean) => number[] }[] = [
+  { label: "I'm still looking for a topic",          currentLevel: 1, getCompleted: (a) => a ? [2] : [] },
+  { label: "I have a topic, working on my proposal", currentLevel: 3, getCompleted: (a) => a ? [1, 2] : [1] },
+  { label: "I'm doing my actual research",           currentLevel: 4, getCompleted: (a) => a ? [1, 2, 3] : [1, 3] },
+  { label: "I'm writing my thesis",                  currentLevel: 5, getCompleted: () => [1, 2, 3, 4] },
+  { label: "I'm preparing for my defense",           currentLevel: 6, getCompleted: () => [1, 2, 3, 4, 5] },
 ];
 
 type Step = 'info' | 'interests' | 'advisor' | 'stage' | 'deadline';
@@ -95,8 +94,9 @@ export default function OnboardingPage() {
     if (prev) setStep(prev);
   }
 
-  function handleStageSelect(completedStages: number[]) {
-    const currentLevel = completedStages.length > 0 ? Math.max(...completedStages) : 0;
+  function handleStageSelect(stage: typeof THESIS_STAGES[number]) {
+    const completedStages = stage.getCompleted(hasAdvisor ?? false);
+    const currentLevel = stage.currentLevel;
     setPendingStages({ currentLevel, completedStages });
     setStep('deadline');
   }
@@ -295,7 +295,7 @@ export default function OnboardingPage() {
               {THESIS_STAGES.map((s, i) => (
                 <button
                   key={i}
-                  onClick={() => handleStageSelect(s.getCompleted(hasAdvisor ?? false))}
+                  onClick={() => handleStageSelect(s)}
                   disabled={loading}
                   className="w-full rounded-2xl px-5 py-4 text-left text-sm transition hover:opacity-80 disabled:opacity-40"
                   style={{ border: `2px solid ${C.border}`, color: C.darkBrown, backgroundColor: C.cream, cursor: 'pointer' }}
@@ -318,12 +318,11 @@ export default function OnboardingPage() {
               We'll suggest deadlines for each level to keep you on track.
             </p>
             <div className="w-full space-y-4">
-              <input
-                type="date"
+              <DatePicker
                 value={mainDeadline}
-                onChange={(e) => setMainDeadline(e.target.value)}
+                onChange={setMainDeadline}
                 min={new Date().toISOString().slice(0, 10)}
-                style={inputStyle}
+                placeholder="Pick your thesis deadline"
               />
               <button onClick={handleDeadlineSubmit} disabled={loading} style={primaryBtn}>
                 {loading ? 'Setting up…' : mainDeadline ? "Let's go →" : 'Skip for now →'}

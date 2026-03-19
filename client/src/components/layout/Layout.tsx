@@ -54,7 +54,7 @@ type HeartParticle = {
 
 
 const LEVEL_NAMES: Record<number, string> = {
-  1: 'Literature Review', 2: 'Topic Selection', 3: 'Research Proposal',
+  1: 'Topic Selection', 2: 'Advisor Selection', 3: 'Research Proposal',
   4: 'Research', 5: 'Writing', 6: 'Defense Prep',
 };
 

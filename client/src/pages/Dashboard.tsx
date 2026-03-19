@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { peekStreakSummary } from '@/services/authService';
 import DailyCheckin from '@/components/DailyCheckin';
 import CompletionModal from '@/components/CompletionModal';
+import DatePicker from '@/components/DatePicker';
 import studyonLogo from '@/assets/Study_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 
@@ -26,7 +27,7 @@ const C = {
 };
 
 const LEVEL_NAMES: Record<number, string> = {
-  1: 'Literature Review', 2: 'Topic Selection', 3: 'Research Proposal',
+  1: 'Topic Selection', 2: 'Advisor Selection', 3: 'Research Proposal',
   4: 'Research', 5: 'Writing', 6: 'Defense Prep',
 };
 
@@ -206,7 +207,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(212,212,216,1)' }}>Dashboard</p>
           <button
-            onClick={() => { sessionStorage.removeItem('activeLevel'); navigate('/app'); }}
+            onClick={() => navigate('/app')}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
             style={{ color: 'rgba(229,229,229,1)', border: '2px solid rgba(82,82,91,1)' }}
           >
@@ -386,13 +387,10 @@ export default function Dashboard() {
                   {deadlines.main ? 'Change deadline' : 'Set deadline'}
                 </button>
               </>) : (<>
-                <input
-                  type="date"
+                <DatePicker
                   value={deadlineInput}
-                  onChange={(e) => setDeadlineInput(e.target.value)}
+                  onChange={setDeadlineInput}
                   min={new Date().toISOString().slice(0, 10)}
-                  className="w-full focus:outline-none"
-                  style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, borderRadius: 8, padding: '9px 14px', fontSize: 14, color: C.darkBrown, marginBottom: 10 }}
                 />
                 <div className="flex gap-2">
                   <button onClick={handleDeadlineSave} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}>Save</button>
