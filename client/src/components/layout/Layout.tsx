@@ -537,7 +537,7 @@ export default function Layout() {
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
-              {activeLevel === 2 && <Level2 />}
+              {activeLevel === 1 && <Level2 />}
               {activeLevel === 6 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (
