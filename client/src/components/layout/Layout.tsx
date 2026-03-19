@@ -137,6 +137,14 @@ export default function Layout() {
       return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
     } catch { return true; }
   });
+  // True when there's no localStorage entry — hold the modal until DB confirms
+  const [checkinVerifying, setCheckinVerifying] = useState(() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return true;
+      return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
+    } catch { return true; }
+  });
   const prevUnlockedRef = useRef<Set<string>>(new Set());
   const isInitializedRef = useRef(false); 
 
@@ -206,12 +214,20 @@ export default function Layout() {
         const level = refreshedUser.currentLevel ?? 0;
         let streak = 0;
         try {
-          const summary = await authService.getStreakSummary({ force: true });
+          const [summary, checkedInToday] = await Promise.all([
+            authService.getStreakSummary({ force: true }),
+            authService.getTodayCheckin(),
+          ]);
           streak = summary.currentStreak;
           setDailyStreak(streak);
+          if (checkedInToday) {
+            setCheckinDone(true);
+            setCheckinOpen(false);
+          }
         } catch {
           streak = 0;
         }
+        setCheckinVerifying(false);
         prevUnlockedRef.current = new Set(
           BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
         );
@@ -848,7 +864,7 @@ export default function Layout() {
       </div>
 
       {/* Daily check-in modal */}
-      {checkinOpen && (
+      {checkinOpen && !checkinVerifying && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }}

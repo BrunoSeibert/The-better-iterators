@@ -169,6 +169,17 @@ export async function getTopicById(id: string) {
   };
 }
 
+export async function getTodayCheckin(): Promise<boolean> {
+  try {
+    const res = await api.get('/checkin');
+    const { history } = res.data as { history: { date: string }[] };
+    const today = new Date().toDateString();
+    return history.some((h) => new Date(h.date).toDateString() === today);
+  } catch {
+    return false;
+  }
+}
+
 export async function getStreakSummary(options?: { force?: boolean }) {
   if (!options?.force && streakSummaryCache) {
     return streakSummaryCache;
