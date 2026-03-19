@@ -50,9 +50,11 @@ async function seed() {
       const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ');
 
       await db.query(
-        `INSERT INTO ${table.name} (${cols}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING`,
+        `INSERT INTO ${table.name} (${cols}) VALUES (${placeholders})
+        ON CONFLICT (id) DO UPDATE SET ${keys.map(k => `"${k}" = EXCLUDED."${k}"`).join(', ')}`,
         vals
       );
+
     }
     console.log(`✅ ${table.name} done (${(table.data as any[]).length} records)`);
   }
