@@ -438,10 +438,17 @@ function CheckSourceResult({ result }: { result: SourceCheckResult }) {
       <SectionLabel>Source Quality Check</SectionLabel>
 
       <div className="flex gap-2 flex-wrap">
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${QUALITY_STYLE[result.journalQuality]}`}>
-          Journal quality: {result.journalQuality}
-        </span>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${result.peerReviewed ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+        {result.sourceType && (
+          <span className="rounded-full border border-neutral-200 bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600">
+            {result.sourceType}
+          </span>
+        )}
+        {result.journalQuality !== 'n/a' && (
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${QUALITY_STYLE[result.journalQuality]}`}>
+            Journal quality: {result.journalQuality}
+          </span>
+        )}
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${result.peerReviewed ? 'bg-green-50 text-green-700 border-green-200' : 'bg-neutral-100 text-neutral-500 border-neutral-200'}`}>
           {result.peerReviewed ? 'Peer reviewed' : 'Not peer reviewed'}
         </span>
       </div>

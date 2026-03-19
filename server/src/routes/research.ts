@@ -237,18 +237,26 @@ router.post('/check-source', requireAuth, async (req: Request, res: Response) =>
       messages: [
         {
           role: 'system',
-          content: `You are an academic source checker. Evaluate the credibility and quality of a given paper.
+          content: `You are an academic source checker. Evaluate the credibility and quality of a given source.
+
+First identify the source type: journal article, conference paper, textbook, book chapter, thesis, preprint, or other.
 
 Respond ONLY with valid JSON:
 {
-  "journalQuality": "high | medium | low | unknown",
+  "sourceType": "journal article | conference paper | textbook | book chapter | thesis | preprint | other",
+  "journalQuality": "high | medium | low | unknown | n/a",
   "peerReviewed": true,
   "citationContext": "Brief note on citation count and influence in the field.",
-  "flags": ["any concerns, e.g. predatory journal, retracted, outdated methodology"],
+  "flags": ["only real concerns: predatory journal, retraction, serious methodological flaws, known fabrication"],
   "verdict": "A 1–2 sentence overall assessment of whether this is a trustworthy source."
 }
 
-Be honest — if you don't have confident information, say so rather than guessing.`,
+Rules:
+- Textbooks by established publishers (Silberschatz, Knuth, Tanenbaum, etc.) are credible even without journal peer review — do NOT flag them as untrustworthy
+- "peerReviewed" for textbooks and standard reference books should be true (they go through editorial review)
+- "journalQuality" should be "n/a" for textbooks, books, and theses
+- Only add flags for genuine red flags (predatory journals, retractions, known fraud) — do not flag simply because a source is a book or lacks a journal
+- If you don't have confident information about a specific detail, say so in citationContext rather than guessing negatively`,
         },
         {
           role: 'user',
