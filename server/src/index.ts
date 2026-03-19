@@ -31,6 +31,7 @@ import researchRoutes from './routes/research';
 import { speechRouter } from './routes/speech';
 import presentationTestRoutes from './routes/presentationTest';
 import dashboardRoutes from './routes/dashboard';
+import { affirmationRouter } from './routes/affirmation';
 import { runMigrations } from './migrate';
 runMigrations().catch(console.error);
 
@@ -47,6 +48,7 @@ app.use('/api/research', researchRoutes);
 app.use('/api/speech', speechRouter);
 app.use('/api/presentation-test', presentationTestRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/affirmation', affirmationRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
