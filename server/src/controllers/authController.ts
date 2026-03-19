@@ -1,5 +1,17 @@
 import { Request, Response } from 'express';
 import * as authService from '../services/authService';
+import { AuthRequest } from '../middleware/auth';
+
+export async function completeOnboarding(req: Request, res: Response) {
+  try {
+    const { currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds } = req.body;
+    const userId = (req as AuthRequest).userId;
+    const result = await authService.completeOnboarding(userId, currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds);
+    res.json({ token: result.token });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}
 
 type AuthedRequest = Request & { userId?: string };
 

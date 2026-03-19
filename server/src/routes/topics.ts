@@ -21,7 +21,21 @@ router.get('/by-university', requireAuth, async (req, res) => {
       [universityId]
     );
 
-    res.json({ topics: result.rows });
+    const parseArr = (v: unknown): string[] => {
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'string') return v.replace(/^\{|\}$/g, '').split(',').filter(Boolean).map(s => s.replace(/^"|"$/g, ''));
+      return [];
+    };
+
+    const topics = result.rows.map((row) => ({
+      ...row,
+      degrees: parseArr(row.degrees),
+      fieldIds: parseArr(row.fieldIds),
+      supervisorIds: parseArr(row.supervisorIds),
+      expertIds: parseArr(row.expertIds),
+    }));
+
+    res.json({ topics });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -56,7 +56,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.login(email, data.password);
       setAuth(result.user, result.token);
-      navigate('/app');
+      navigate(result.user.isOnboarded ? '/app' : '/onboarding');
     } catch {
       setError('Invalid email or password');
     }
@@ -67,7 +67,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.register(data.name, data.email, data.password);
       setAuth(result.user, result.token);
-      navigate('/app');
+      navigate('/onboarding');
     } catch {
       setError('Registration failed. Email may already be in use.');
     }

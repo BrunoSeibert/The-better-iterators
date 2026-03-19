@@ -2,6 +2,17 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { db } from '../config/db';
 
+const LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
+const UNLOCK_DEPS: Record<number, number[]> = {
+  1: [],
+  2: [],
+  3: [1],
+  4: [1, 2, 3],
+  5: [4],
+  6: [5],
+  7: [6],
+};
+
 function getLocalDateKey(date = new Date()) {
   return [
     date.getFullYear(),
@@ -19,6 +30,30 @@ export async function touchDailyLogin(userId: string) {
   );
 }
 
+function normalizeCompletedStages(completedStages: unknown): number[] {
+  if (!Array.isArray(completedStages)) {
+    return [];
+  }
+
+  return [...new Set(completedStages.filter((stage): stage is number => typeof stage === 'number'))].sort((a, b) => a - b);
+}
+
+function isLevelUnlocked(level: number, completedStages: number[]) {
+  return UNLOCK_DEPS[level]?.every((dependency) => completedStages.includes(dependency)) ?? false;
+}
+
+function getFirstOpenLevel(completedStages: number[]) {
+  return LEVELS.find((level) => isLevelUnlocked(level, completedStages) && !completedStages.includes(level)) ?? 1;
+}
+
+function signToken(user: { id: string; name: string; email: string; is_onboarded: boolean; current_level: number; completed_stages?: number[] }) {
+  return jwt.sign(
+    { userId: user.id, user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] } },
+    process.env.JWT_SECRET!,
+    { expiresIn: '7d' }
+  );
+}
+
 export async function register(name: string, email: string, password: string) {
   const existing = await db.query('SELECT id FROM "User" WHERE email = $1', [email]);
   if (existing.rows.length > 0) throw new Error('Email already in use');
@@ -27,17 +62,17 @@ export async function register(name: string, email: string, password: string) {
   const result = await db.query(
     `INSERT INTO "User" (id, name, email, password, current_level, first_login_date)
      VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 1, $4::date)
-     RETURNING id, name, email, current_level, first_login_date`,
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date`,
     [name, email, hashed, getLocalDateKey()]
   );
   const user = result.rows[0];
   await touchDailyLogin(user.id);
-  const token = jwt.sign({ userId: user.id, user: { id: user.id, name: user.name, email: user.email } }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-  return { user, token };
+  const token = signToken(user);
+  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] }, token };
 }
 
 export async function login(email: string, password: string) {
-  const result = await db.query('SELECT * FROM "User" WHERE email = $1', [email]);
+  const result = await db.query('SELECT id, name, email, password, is_onboarded, current_level, completed_stages FROM "User" WHERE email = $1', [email]);
   const user = result.rows[0];
   if (!user) throw new Error('Invalid credentials');
 
@@ -45,14 +80,33 @@ export async function login(email: string, password: string) {
   if (!valid) throw new Error('Invalid credentials');
 
   await touchDailyLogin(user.id);
-  const token = jwt.sign({ userId: user.id, user: { id: user.id, name: user.name, email: user.email } }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-  const { password: _, ...safeUser } = user;
-  return { user: safeUser, token };
+  const token = signToken(user);
+  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] }, token };
+}
+
+export async function completeOnboarding(
+  userId: string,
+  currentLevel: number,
+  completedStages: number[],
+  universityId: string,
+  studyProgramId: string,
+  degreeType: string,
+  fieldIds: string[]
+) {
+  const result = await db.query(
+    `UPDATE "User"
+     SET is_onboarded = TRUE, current_level = $1, completed_stages = $2::int[],
+         university_id = $3, study_program_id = $4, degree_type = $5, field_ids = $6::text[]
+     WHERE id = $7
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages`,
+    [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
+  );
+  return { token: signToken(result.rows[0]) };
 }
 
 export async function getUserById(userId: string) {
   const result = await db.query(
-    'SELECT id, name, email, current_level, first_login_date FROM "User" WHERE id = $1',
+    'SELECT id, name, email, is_onboarded, current_level, completed_stages, first_login_date FROM "User" WHERE id = $1',
     [userId]
   );
   return result.rows[0] ?? null;
@@ -60,16 +114,42 @@ export async function getUserById(userId: string) {
 
 export async function resetLevel(userId: string) {
   const result = await db.query(
-    'UPDATE "User" SET current_level = 1 WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
-    [userId]
+    'UPDATE "User" SET current_level = $1, completed_stages = $2 WHERE id = $3 RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date',
+    [1, [], userId]
   );
   return result.rows[0] ?? null;
 }
 
 export async function progressLevel(userId: string) {
-  const result = await db.query(
-    'UPDATE "User" SET current_level = LEAST(COALESCE(current_level, 1) + 1, 7) WHERE id = $1 RETURNING id, name, email, current_level, first_login_date',
+  const currentResult = await db.query(
+    'SELECT current_level, completed_stages FROM "User" WHERE id = $1',
     [userId]
+  );
+  const currentUser = currentResult.rows[0];
+
+  if (!currentUser) {
+    return null;
+  }
+
+  const completedStages = normalizeCompletedStages(currentUser.completed_stages);
+  const progressableLevel =
+    (typeof currentUser.current_level === 'number'
+      && isLevelUnlocked(currentUser.current_level, completedStages)
+      && !completedStages.includes(currentUser.current_level)
+      ? currentUser.current_level
+      : getFirstOpenLevel(completedStages));
+  const nextCompletedStages = completedStages.includes(progressableLevel)
+    ? completedStages
+    : [...completedStages, progressableLevel];
+  const nextLevel = getFirstOpenLevel(nextCompletedStages);
+
+  const result = await db.query(
+    `UPDATE "User"
+     SET current_level = $1,
+         completed_stages = $2
+     WHERE id = $3
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date`,
+    [nextLevel, nextCompletedStages, userId]
   );
   return result.rows[0] ?? null;
 }
@@ -81,9 +161,7 @@ export async function getStreakSummary(userId: string) {
   );
   const user = userResult.rows[0];
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
@@ -120,7 +198,6 @@ export async function getStreakSummary(userId: string) {
 
   if (latestLoginKey === todayKey || latestLoginKey === yesterdayKey) {
     const cursor = new Date(`${latestLoginKey}T00:00:00.000Z`);
-
     while (loginDaySet.has(cursor.toISOString().slice(0, 10))) {
       streakDates.push(cursor.toISOString().slice(0, 10));
       currentStreak += 1;

@@ -5,13 +5,11 @@ type Topic = {
   id: string;
   title: string;
   description: string;
-  type: string;
   employment: string;
   employmentType: string | null;
   workplaceType: string | null;
   degrees: string[];
   companyId: string;
-  universityId: string;
 };
 
 export default function Level2() {
@@ -67,7 +65,7 @@ export default function Level2() {
   }
 
   return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {topics.map((topic) => (
         <div
           key={topic.id}
@@ -80,16 +78,14 @@ export default function Level2() {
             {topic.description}
           </p>
           <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
-            {Array.isArray(topic.degrees)
-              ? topic.degrees.map((d) => (
-                  <span
-                    key={d}
-                    className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium uppercase text-neutral-600"
-                  >
-                    {d}
-                  </span>
-                ))
-              : null}
+            {topic.degrees.map((d) => (
+              <span
+                key={d}
+                className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium uppercase text-neutral-600"
+              >
+                {d}
+              </span>
+            ))}
             {topic.workplaceType && (
               <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
                 {topic.workplaceType}

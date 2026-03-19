@@ -4,7 +4,9 @@ interface User {
   id: string;
   name: string;
   email: string;
-  current_level: number;
+  isOnboarded: boolean;
+  currentLevel: number;
+  completedStages: number[];
 }
 
 interface AuthState {
@@ -20,7 +22,8 @@ function getUserFromToken(token: string | null): User | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) return null;
-    return payload.user ?? null;
+    if (!payload.user) return null;
+    return payload.user;
   } catch {
     return null;
   }
@@ -35,7 +38,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('token', token);
     set({ user, token });
   },
-  setUser: (user) => set((state) => ({ ...state, user })),
+  setUser: (user) => set((state) => ({ ...state, user: { ...state.user!, ...user } as User })),
   logout: () => {
     localStorage.removeItem('token');
     set({ user: null, token: null });
