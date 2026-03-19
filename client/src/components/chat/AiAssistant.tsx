@@ -36,6 +36,24 @@ export default function AiAssistant() {
     setLoading(true);
 
     try {
+      const checkinContext = (() => {
+        try {
+          const raw = localStorage.getItem('todayCheckin');
+          if (!raw) return undefined;
+          const c = JSON.parse(raw);
+          const today = new Date().toDateString();
+          if (new Date(c.date).toDateString() !== today) return undefined;
+          const energyLabel = ['', 'exhausted', 'tired', 'okay', 'good', 'energized'][c.energy] ?? '';
+          return [
+            `Energy: ${c.energy}/5 (${energyLabel})`,
+            c.lastProgress ? `Last worked on: ${c.lastProgress}` : null,
+            `Today's focus: ${c.focus}`,
+            c.timeAvailable ? `Time available: ${c.timeAvailable}` : null,
+            c.blocker ? `Blocker: ${c.blocker}` : null,
+          ].filter(Boolean).join('\n');
+        } catch { return undefined; }
+      })();
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -45,6 +63,7 @@ export default function AiAssistant() {
         body: JSON.stringify({
           messages: newMessages,
           conversationId,
+          checkinContext,
         }),
       });
       const data = await res.json();

@@ -36,6 +36,23 @@
 }
 
 @layer utilities {
+  @keyframes assistant-heart-float {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 6px, 0) scale(0.72);
+    }
+
+    15% {
+      opacity: 0.5;
+      transform: translate3d(4px, -4px, 0) scale(1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate3d(var(--assistant-heart-drift-x, -10px), var(--assistant-heart-drift-y, -58px), 0) scale(var(--assistant-heart-scale-to, 1.08));
+    }
+  }
+
   .roadmap-scroll {
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
