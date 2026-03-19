@@ -1,5 +1,7 @@
 import { api } from './api';
 
+const STREAK_CACHE_KEY = 'studyon.streak-summary';
+
 type AuthUser = {
   id: string;
   name: string;
@@ -25,6 +27,15 @@ type RawAuthUser = {
   firstLoginDate?: string;
 };
 
+export type StreakSummary = {
+  firstLoginDate: string;
+  currentStreak: number;
+  activeDates: string[];
+  streakDates: string[];
+  month: number;
+  year: number;
+};
+
 const normalizeUser = (user: RawAuthUser): AuthUser => ({
   id: user.id,
   name: user.name,
@@ -35,6 +46,45 @@ const normalizeUser = (user: RawAuthUser): AuthUser => ({
   first_login_date: user.first_login_date,
   firstLoginDate: user.firstLoginDate ?? user.first_login_date,
 });
+
+const readCachedStreakSummary = (): StreakSummary | null => {
+  try {
+    const rawValue = localStorage.getItem(STREAK_CACHE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    return JSON.parse(rawValue) as StreakSummary;
+  } catch {
+    return null;
+  }
+};
+
+let streakSummaryCache: StreakSummary | null = readCachedStreakSummary();
+let streakSummaryPromise: Promise<StreakSummary> | null = null;
+
+const persistCachedStreakSummary = (summary: StreakSummary | null) => {
+  streakSummaryCache = summary;
+
+  try {
+    if (summary) {
+      localStorage.setItem(STREAK_CACHE_KEY, JSON.stringify(summary));
+    } else {
+      localStorage.removeItem(STREAK_CACHE_KEY);
+    }
+  } catch {
+    // Ignore localStorage write failures and keep the in-memory cache.
+  }
+};
+
+export function peekStreakSummary() {
+  return streakSummaryCache;
+}
+
+export function clearStreakSummaryCache() {
+  streakSummaryPromise = null;
+  persistCachedStreakSummary(null);
+}
 
 export async function register(name: string, email: string, password: string) {
   const res = await api.post('/auth/register', { name, email, password });
@@ -151,16 +201,26 @@ export async function getTopicById(id: string) {
   };
 }
 
-export async function getStreakSummary() {
-  const res = await api.get('/auth/streak');
-  return res.data as {
-    firstLoginDate: string;
-    currentStreak: number;
-    activeDates: string[];
-    streakDates: string[];
-    month: number;
-    year: number;
-  };
+export async function getStreakSummary(options?: { force?: boolean }) {
+  if (!options?.force && streakSummaryCache) {
+    return streakSummaryCache;
+  }
+
+  if (streakSummaryPromise) {
+    return streakSummaryPromise;
+  }
+
+  streakSummaryPromise = api.get('/auth/streak')
+    .then((res) => {
+      const summary = res.data as StreakSummary;
+      persistCachedStreakSummary(summary);
+      return summary;
+    })
+    .finally(() => {
+      streakSummaryPromise = null;
+    });
+
+  return streakSummaryPromise;
 }
 
 export type StarterPaper = {
