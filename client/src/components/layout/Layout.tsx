@@ -617,12 +617,6 @@ const closeAssistant = () => {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleCheckinButtonClick}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
