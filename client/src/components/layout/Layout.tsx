@@ -51,6 +51,11 @@ type HeartParticle = {
 };
 
 
+const LEVEL_NAMES: Record<number, string> = {
+  1: 'Literature Review', 2: 'Topic Selection', 3: 'Research Proposal',
+  4: 'Research', 5: 'Writing', 6: 'Defense Prep',
+};
+
 const UNLOCK_DEPS: Record<number, number[]> = {
   1: [], 2: [], 3: [1, 2], 4: [3], 5: [4], 6: [5],
 };
@@ -94,6 +99,8 @@ export default function Layout() {
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [levelUpNumber, setLevelUpNumber] = useState<number | null>(null);
+  const [levelUpExiting, setLevelUpExiting] = useState(false);
   const [dailyStreak, setDailyStreak] = useState<number | null>(() => authService.peekStreakSummary()?.currentStreak ?? null);
   const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
   const [levelSixDragging, setLevelSixDragging] = useState(false);
@@ -123,14 +130,15 @@ export default function Layout() {
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
 
-  const [checkinDone, setCheckinDone] = useState(() => {
+  const [checkinOpen, setCheckinOpen] = useState(() => {
     try {
       const raw = localStorage.getItem('todayCheckin');
-      if (!raw) return false;
-      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
-    } catch { return false; }
+      if (!raw) return true;
+      return new Date(JSON.parse(raw).date).toDateString() !== new Date().toDateString();
+    } catch { return true; }
   });
-  const [checkinOpen, setCheckinOpen] = useState(() => {
+  // True when there's no localStorage entry — hold the modal until DB confirms
+  const [checkinVerifying, setCheckinVerifying] = useState(() => {
     try {
       const raw = localStorage.getItem('todayCheckin');
       if (!raw) return true;
@@ -206,12 +214,17 @@ export default function Layout() {
         const level = refreshedUser.currentLevel ?? 0;
         let streak = 0;
         try {
-          const summary = await authService.getStreakSummary({ force: true });
+          const [summary, checkedInToday] = await Promise.all([
+            authService.getStreakSummary({ force: true }),
+            authService.getTodayCheckin(),
+          ]);
           streak = summary.currentStreak;
           setDailyStreak(streak);
+          setCheckinOpen(!checkedInToday);
         } catch {
           streak = 0;
         }
+        setCheckinVerifying(false);
         prevUnlockedRef.current = new Set(
           BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
         );
@@ -383,7 +396,7 @@ export default function Layout() {
     setLevelLoading(true);
 
     try {
-      const previousLevel = furthestUnlockedLevel;
+
       const refreshedState = action === 'reset'
         ? await (async () => {
         const { user: refreshedUser } = await authService.resetLevel();
@@ -394,15 +407,22 @@ export default function Layout() {
             return applyLevelState(refreshedUser);
           })();
 
-      if (action === 'progress' && refreshedState.unlockedLevel > previousLevel) {
+      if (action === 'progress') {
+        setLevelUpNumber(refreshedState.unlockedLevel);
+        setLevelUpExiting(false);
         setShowLevelUp(true);
         if (levelUpTimeoutRef.current !== null) {
           window.clearTimeout(levelUpTimeoutRef.current);
         }
+        // start exit animation at 2.6s, unmount at 3s
         levelUpTimeoutRef.current = window.setTimeout(() => {
-          setShowLevelUp(false);
-          levelUpTimeoutRef.current = null;
-        }, 500);
+          setLevelUpExiting(true);
+          window.setTimeout(() => {
+            setShowLevelUp(false);
+            setLevelUpExiting(false);
+            levelUpTimeoutRef.current = null;
+          }, 400);
+        }, 1500);
       }
     } finally {
       setLevelLoading(false);
@@ -448,16 +468,7 @@ export default function Layout() {
     setAssistantOpen(true);
   };
 
-  const handleCheckinButtonClick = () => {
-    if (checkinDone) {
-      localStorage.removeItem('todayCheckin');
-      setCheckinDone(false);
-    }
-
-    setCheckinOpen(true);
-  };
-
-  const closeAssistant = () => {
+const closeAssistant = () => {
     const source = assistantBadgerRef.current?.getBoundingClientRect();
     const target = badgerButtonSlotRef.current?.getBoundingClientRect();
 
@@ -522,20 +533,46 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
       {showLevelUp && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-yellow-300/85">
-          <span className="text-5xl font-bold uppercase tracking-[0.3em] text-neutral-950">
-            Level up
-          </span>
+        <div
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', animation: 'levelup-backdrop-in 0.3s ease forwards' }}
+        >
+          <div
+            className="flex flex-col items-center gap-5 px-14 py-10 text-center"
+            style={{
+              backgroundColor: 'rgba(252,248,243,1)',
+              border: '1px solid rgba(196,177,160,1)',
+              borderRadius: 18,
+              boxShadow: '0 8px 40px rgba(81,60,45,0.22)',
+              animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards',
+            }}
+          >
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'rgba(81,60,45,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}
+            >
+              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(252,248,243,1)' }}>
+                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(140,115,95,1)' }}>Congratulations</p>
+              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(81,60,45,1)' }}>One step closer to your thesis</p>
+              {levelUpNumber && (
+                <p className="mt-2 text-sm" style={{ color: 'rgba(140,115,95,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
       <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          className="flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Back to Dashboard"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/>
           </svg>
           <span className="text-sm font-medium">Dashboard</span>
@@ -548,12 +585,15 @@ export default function Layout() {
         <button
           type="button"
           onClick={() => navigate('/streak')}
-          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
+          className="ml-4 flex items-center gap-1.5 rounded-md px-5 py-2.5 text-orange-400 transition hover:bg-white/5"
           aria-label="Open streak page"
         >
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
-          <span className="text-xl font-semibold text-orange-400">
-            {dailyStreak === null ? '...' : `${dailyStreak} days`}
+          <span
+            className="text-[1.45rem] leading-none text-orange-400"
+            style={{ fontFamily: '"Arial Black", "Avenir Next", sans-serif', fontWeight: 900 }}
+          >
+            {dailyStreak === null ? '...' : dailyStreak}
           </span>
         </button>
         <div className="ml-8 flex items-center gap-3 lg:ml-12">
@@ -577,18 +617,12 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleCheckinButtonClick}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
-          >
-            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
-          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
               type="button"
               onClick={openAssistant}
-              className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+              className="relative h-full w-full overflow-hidden rounded-[15%] transition hover:opacity-80"
               aria-label="Show AI Assistant"
             >
               <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
@@ -604,8 +638,8 @@ export default function Layout() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/profile')}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          onClick={() => navigate('/profile', { state: { returnTo: '/app' } })}
+          className="flex items-center gap-2 rounded-md px-5 py-3 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Profile"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
@@ -848,7 +882,7 @@ export default function Layout() {
       </div>
 
       {/* Daily check-in modal */}
-      {checkinOpen && (
+      {checkinOpen && !checkinVerifying && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ backgroundColor: 'rgba(40,28,20,0.55)', backdropFilter: 'blur(3px)' }}
@@ -877,7 +911,7 @@ export default function Layout() {
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => setCheckinDone(true)} />
+            <DailyCheckin onComplete={() => {}} />
           </div>
         </div>
       )}

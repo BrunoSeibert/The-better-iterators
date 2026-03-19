@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import * as authService from '../services/authService';
 import StudyondLogo from '../components/ui/StudyondLogo';
@@ -32,14 +32,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const token = useAuthStore((s) => s.token);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
 
   useEffect(() => {
     if (token) {
-      navigate('/dashboard');
+      navigate(returnTo ?? '/dashboard');
     }
-  }, [navigate, token]);
+  }, [navigate, returnTo, token]);
 
   const emailForm = useForm<EmailForm>({ resolver: zodResolver(emailSchema) });
   const passwordForm = useForm<PasswordForm>({ resolver: zodResolver(passwordSchema) });
@@ -56,7 +58,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.login(email, data.password);
       setAuth(result.user, result.token);
-      navigate(result.user.isOnboarded ? '/dashboard' : '/onboarding');
+      navigate(result.user.isOnboarded ? (returnTo ?? '/dashboard') : '/onboarding');
     } catch {
       setError('Invalid email or password');
     }
