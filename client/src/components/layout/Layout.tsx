@@ -17,6 +17,9 @@ import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
+import AchievementToast from '../AchievementToast';
+import { BADGES } from '@/utils/badges';
+
 
 const levels = Array.from({ length: 7 }, (_, index) => index + 1);
 const topbarHeight = 'max(10vh, 72px)';
@@ -28,6 +31,7 @@ type RectState = {
   width: number;
   height: number;
 };
+
 
 const UNLOCK_DEPS: Record<number, number[]> = {
   1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
@@ -89,6 +93,9 @@ export default function Layout() {
     startX: 0,
     scrollLeft: 0,
   });
+
+  const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
+  const prevUnlockedRef = useRef<Set<string>>(new Set());
 
   const refreshLevelState = useCallback(
     async (requestedActiveLevel?: number) => {
@@ -249,6 +256,24 @@ export default function Layout() {
       isMounted = false;
     };
   }, []);
+
+  const level = user?.currentLevel ?? 0;
+
+  useEffect(() => {
+    const newlyUnlocked = BADGES.filter((badge) => {
+      const isUnlocked = badge.condition(dailyStreak, level);
+      const wasUnlocked = prevUnlockedRef.current.has(badge.label);
+      return isUnlocked && !wasUnlocked;
+    });
+
+    prevUnlockedRef.current = new Set(
+      BADGES.filter((b) => b.condition(dailyStreak, level)).map((b) => b.label)
+    );
+
+    if (newlyUnlocked.length > 0) {
+      setAchievementQueue((prev) => [...prev, ...newlyUnlocked]);
+    }
+  }, [dailyStreak, level]);
 
   const updateLevel = async (action: 'reset' | 'progress') => {
     if (levelLoading) {
@@ -666,6 +691,19 @@ export default function Layout() {
           />
         </div>
       )}
+      <div className="pointer-events-none fixed bottom-6 left-6 z-50 flex flex-col gap-3">
+        {achievementQueue.slice(0, 3).map((badge) => (
+          <AchievementToast
+            key={badge.label}
+            emoji={badge.emoji}
+            label={badge.label}
+            description={badge.description}
+            onDone={() =>
+              setAchievementQueue((prev) => prev.filter((b) => b.label !== badge.label))
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }
