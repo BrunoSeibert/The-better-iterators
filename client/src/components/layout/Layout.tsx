@@ -1,4 +1,8 @@
 import {
+  type CSSProperties,
+  type ChangeEvent,
+  type DragEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -7,240 +11,465 @@ import {
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
+import Level2 from '@/pages/Level2';
+import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
 
 const levels = Array.from({ length: 7 }, (_, index) => index + 1);
+const topbarHeight = 'max(10vh, 72px)';
+const assistantPanelWidth = 'clamp(320px, 32vw, 380px)';
 
-const BADGES = [
-  { emoji: '🎖️', label: 'First Step',  description: 'Join StudyOnd',          condition: (_streak: number, _level: number) => true },
-  { emoji: '🔥', label: 'On Fire',     description: 'Reach a 3-day streak',    condition: (streak: number, _level: number) => streak >= 3 },
-  { emoji: '🎓', label: 'Scholar',     description: 'Reach level 3',           condition: (_streak: number, level: number) => level >= 3 },
-  { emoji: '🚀', label: 'Rocket',      description: 'Reach level 5',           condition: (_streak: number, level: number) => level >= 5 },
-  { emoji: '💡', label: 'Innovator',   description: 'Reach level 6',           condition: (_streak: number, level: number) => level >= 6 },
-  { emoji: '👑', label: 'Champion',    description: 'Complete all 7 levels',   condition: (_streak: number, level: number) => level >= 7 },
-];
+type RectState = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+const UNLOCK_DEPS: Record<number, number[]> = {
+  1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
+};
+
+function isLevelUnlocked(level: number, completedStages: number[]) {
+  return UNLOCK_DEPS[level]?.every((dependency) => completedStages.includes(dependency)) ?? false;
+}
+
+function getFirstOpenLevel(completedStages: number[]) {
+  return levels.find((level) => isLevelUnlocked(level, completedStages) && !completedStages.includes(level)) ?? 1;
+}
+
+function getFurthestUnlockedLevel(completedStages: number[]) {
+  return [...levels].reverse().find((level) => isLevelUnlocked(level, completedStages)) ?? 1;
+}
+
+function getPreferredActiveLevel(currentLevel: number | undefined, completedStages: number[]) {
+  if (
+    typeof currentLevel === 'number' &&
+    isLevelUnlocked(currentLevel, completedStages) &&
+    !completedStages.includes(currentLevel)
+  ) {
+    return currentLevel;
+  }
+
+  return getFirstOpenLevel(completedStages);
+}
 
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const logout = useAuthStore((s) => s.logout);
-  const [activeLevel, setActiveLevel] = useState(() => user?.current_level ?? 1);
-  const [unlockedLevel, setUnlockedLevel] = useState(() => user?.current_level ?? 1);
+  const completedStages = user?.completedStages ?? [];
+  const preferredActiveLevel = getPreferredActiveLevel(user?.currentLevel, completedStages);
+  const furthestUnlockedLevel = getFurthestUnlockedLevel(completedStages);
+  const [activeLevel, setActiveLevel] = useState(preferredActiveLevel);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [dailyStreak, setDailyStreak] = useState(0);
-  const [badgesOpen, setBadgesOpen] = useState(false);
-  const [notification, setNotification] = useState<{ emoji: string; label: string } | null>(null);
-  const [notifVisible, setNotifVisible] = useState(false);
-  const prevUnlockedBadges = useRef<Set<string>>(new Set());
+  const [levelSixFile, setLevelSixFile] = useState<File | null>(null);
+  const [levelSixDragging, setLevelSixDragging] = useState(false);
+  const [levelSixCorrecting, setLevelSixCorrecting] = useState(false);
+  const [badgerTransition, setBadgerTransition] = useState<{
+    from: RectState;
+    to: RectState;
+    phase: 'start' | 'end';
+  } | null>(null);
   const navigate = useNavigate();
   const roadmapRef = useRef<HTMLDivElement | null>(null);
+  const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
+  const badgerButtonSlotRef = useRef<HTMLDivElement | null>(null);
+  const assistantBadgerRef = useRef<HTMLImageElement | null>(null);
+  const badgerTransitionTimeoutRef = useRef<number | null>(null);
   const levelUpTimeoutRef = useRef<number | null>(null);
-  const dragState = useRef({ isDragging: false, startX: 0, scrollLeft: 0 });
+  const dragState = useRef({
+    isDragging: false,
+    startX: 0,
+    scrollLeft: 0,
+  });
 
-  // Check for newly unlocked badges
-  useEffect(() => {
-    BADGES.forEach((badge) => {
-      const unlocked = badge.condition(dailyStreak, unlockedLevel);
-      const wasUnlocked = prevUnlockedBadges.current.has(badge.label);
-      if (unlocked && !wasUnlocked && prevUnlockedBadges.current.size > 0) {
-        setNotification({ emoji: badge.emoji, label: badge.label });
-        setNotifVisible(true);
-        setTimeout(() => setNotifVisible(false), 3500);
-      }
-      if (unlocked) prevUnlockedBadges.current.add(badge.label);
-    });
-  }, [dailyStreak, unlockedLevel]);
+  const refreshLevelState = useCallback(
+    async (requestedActiveLevel?: number) => {
+      const { user: refreshedUser } = await authService.me();
+      const refreshedCompletedStages = refreshedUser.completedStages ?? [];
+      const fallbackActiveLevel = getPreferredActiveLevel(
+        refreshedUser.currentLevel,
+        refreshedCompletedStages
+      );
+      const nextActiveLevel =
+        typeof requestedActiveLevel === 'number'
+        && isLevelUnlocked(requestedActiveLevel, refreshedCompletedStages)
+          ? requestedActiveLevel
+          : fallbackActiveLevel;
+
+      setUser(refreshedUser);
+      setActiveLevel(nextActiveLevel);
+
+      return {
+        user: refreshedUser,
+        activeLevel: nextActiveLevel,
+        unlockedLevel: getFurthestUnlockedLevel(refreshedCompletedStages),
+      };
+    },
+    [setUser]
+  );
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-    if (!container) return;
-    if ((event.target as HTMLElement).closest('button')) return;
-    dragState.current = { isDragging: true, startX: event.clientX, scrollLeft: container.scrollLeft };
+
+    if (!container) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+
+    if (target.closest('button')) {
+      return;
+    }
+
+    dragState.current = {
+      isDragging: true,
+      startX: event.clientX,
+      scrollLeft: container.scrollLeft,
+    };
+
     container.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-    if (!container || !dragState.current.isDragging) return;
-    container.scrollLeft = dragState.current.scrollLeft - (event.clientX - dragState.current.startX);
+
+    if (!container || !dragState.current.isDragging) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.current.startX;
+    container.scrollLeft = dragState.current.scrollLeft - deltaX;
   };
 
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     const container = roadmapRef.current;
-    if (!container || container.scrollWidth <= container.clientWidth) return;
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-    if (delta === 0) return;
+
+    if (!container) {
+      return;
+    }
+
+    if (container.scrollWidth <= container.clientWidth) {
+      return;
+    }
+
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+
+    if (delta === 0) {
+      return;
+    }
+
     event.preventDefault();
     container.scrollLeft += delta;
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const container = roadmapRef.current;
+
     dragState.current.isDragging = false;
-    if (roadmapRef.current?.hasPointerCapture(event.pointerId)) {
-      roadmapRef.current.releasePointerCapture(event.pointerId);
+
+    if (container?.hasPointerCapture(event.pointerId)) {
+      container.releasePointerCapture(event.pointerId);
     }
   };
 
   useEffect(() => {
-    if (!user?.current_level) return;
-    setUnlockedLevel(user.current_level);
-    setActiveLevel((cur) => cur > user.current_level ? user.current_level : cur);
-  }, [user?.current_level]);
+    if (!user) {
+      return;
+    }
+
+    setActiveLevel((currentActiveLevel) =>
+      isLevelUnlocked(currentActiveLevel, completedStages) ? currentActiveLevel : preferredActiveLevel
+    );
+  }, [completedStages, preferredActiveLevel, user]);
 
   useEffect(() => {
-    if ((user && typeof user.current_level === 'number') || !localStorage.getItem('token')) return;
+    if (!localStorage.getItem('token')) {
+      return;
+    }
+
     let isMounted = true;
-    authService.me()
-      .then(({ user: fetchedUser }) => {
-        if (!isMounted) return;
-        setUser(fetchedUser);
-        setUnlockedLevel(fetchedUser.current_level);
-        setActiveLevel(fetchedUser.current_level);
-      })
-      .catch(() => { if (isMounted) { logout(); navigate('/'); } });
-    return () => { isMounted = false; };
-  }, [logout, navigate, setUser, user]);
+
+    refreshLevelState()
+      .catch(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        logout();
+        navigate('/');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [logout, navigate, refreshLevelState]);
 
   useEffect(() => {
-    return () => { if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current); };
+    return () => {
+      if (levelUpTimeoutRef.current !== null) {
+        window.clearTimeout(levelUpTimeoutRef.current);
+      }
+      if (badgerTransitionTimeoutRef.current !== null) {
+        window.clearTimeout(badgerTransitionTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) return;
+    if (!localStorage.getItem('token')) {
+      return;
+    }
+
     let isMounted = true;
-    authService.getStreakSummary()
-      .then((summary) => { if (isMounted) setDailyStreak(summary.currentStreak); })
-      .catch(() => { if (isMounted) setDailyStreak(0); });
-    return () => { isMounted = false; };
+
+    authService
+      .getStreakSummary()
+      .then((summary) => {
+        if (isMounted) {
+          setDailyStreak(summary.currentStreak);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setDailyStreak(0);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const updateLevel = async (action: 'reset' | 'progress') => {
-    if (levelLoading) return;
+    if (levelLoading) {
+      return;
+    }
+
     setLevelLoading(true);
+
     try {
-      const response = action === 'reset' ? await authService.resetLevel() : await authService.progressLevel();
-      const previousLevel = unlockedLevel;
-      setUser(response.user);
-      setUnlockedLevel(response.user.current_level);
-      setActiveLevel(response.user.current_level);
-      if (action === 'progress' && response.user.current_level > previousLevel) {
+      const previousLevel = furthestUnlockedLevel;
+      if (action === 'reset') {
+        await authService.resetLevel();
+      } else {
+        await authService.progressLevel();
+      }
+      const refreshedState = await refreshLevelState();
+
+      if (action === 'progress' && refreshedState.unlockedLevel > previousLevel) {
         setShowLevelUp(true);
-        if (levelUpTimeoutRef.current !== null) window.clearTimeout(levelUpTimeoutRef.current);
-        levelUpTimeoutRef.current = window.setTimeout(() => { setShowLevelUp(false); levelUpTimeoutRef.current = null; }, 500);
+        if (levelUpTimeoutRef.current !== null) {
+          window.clearTimeout(levelUpTimeoutRef.current);
+        }
+        levelUpTimeoutRef.current = window.setTimeout(() => {
+          setShowLevelUp(false);
+          levelUpTimeoutRef.current = null;
+        }, 500);
       }
     } finally {
       setLevelLoading(false);
     }
   };
 
+  const handleLevelSelect = async (level: number) => {
+    if (levelLoading) {
+      return;
+    }
+
+    try {
+      await refreshLevelState(level);
+    } catch {
+      logout();
+      navigate('/');
+    }
+  };
+
+  const handleLevelSixFile = (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setLevelSixFile(file);
+    setLevelSixCorrecting(false);
+    setLevelSixDragging(false);
+  };
+
+  const handleLevelSixFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    handleLevelSixFile(event.target.files?.[0] ?? null);
+  };
+
+  const handleLevelSixDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setLevelSixDragging(false);
+    handleLevelSixFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
+  const resetLevelSixFileState = () => {
+    setLevelSixFile(null);
+    setLevelSixCorrecting(false);
+    setLevelSixDragging(false);
+
+    if (levelSixFileInputRef.current) {
+      levelSixFileInputRef.current.value = '';
+    }
+  };
+
+  const openAssistant = () => {
+    setAssistantOpen(true);
+  };
+
+  const closeAssistant = () => {
+    const source = assistantBadgerRef.current?.getBoundingClientRect();
+    const target = badgerButtonSlotRef.current?.getBoundingClientRect();
+
+    if (!source || !target) {
+      setAssistantOpen(false);
+      return;
+    }
+
+    const from = {
+      top: source.top,
+      left: source.left,
+      width: source.width,
+      height: source.height,
+    };
+    const to = {
+      top: target.top,
+      left: target.left,
+      width: target.width,
+      height: target.height,
+    };
+
+    if (badgerTransitionTimeoutRef.current !== null) {
+      window.clearTimeout(badgerTransitionTimeoutRef.current);
+    }
+
+    setBadgerTransition({ from, to, phase: 'start' });
+    setAssistantOpen(false);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setBadgerTransition((current) =>
+          current ? { ...current, phase: 'end' } : null
+        );
+      });
+    });
+
+    badgerTransitionTimeoutRef.current = window.setTimeout(() => {
+      setBadgerTransition(null);
+      badgerTransitionTimeoutRef.current = null;
+    }, 320);
+  };
+
+  const badgerTransitionStyle: CSSProperties | undefined = badgerTransition
+    ? {
+        top: badgerTransition.phase === 'start'
+          ? badgerTransition.from.top
+          : badgerTransition.to.top,
+        left: badgerTransition.phase === 'start'
+          ? badgerTransition.from.left
+          : badgerTransition.to.left,
+        width: badgerTransition.phase === 'start'
+          ? badgerTransition.from.width
+          : badgerTransition.to.width,
+        height: badgerTransition.phase === 'start'
+          ? badgerTransition.from.height
+          : badgerTransition.to.height,
+      }
+    : undefined;
+  const showTopbarBadgerImage = !assistantOpen && !badgerTransition;
+  const showTopbarBadgerButton = !assistantOpen || Boolean(badgerTransition);
+
   return (
     <div className="min-h-screen bg-neutral-300 text-neutral-950">
-
-      {/* Level Up overlay */}
       {showLevelUp && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-yellow-300/85">
-          <span className="text-5xl font-bold uppercase tracking-[0.3em] text-neutral-950">Level up</span>
+          <span className="text-5xl font-bold uppercase tracking-[0.3em] text-neutral-950">
+            Level up
+          </span>
         </div>
       )}
-
-      {/* Achievement notification — always in DOM, slides in/out */}
-      <div
-        className={`fixed bottom-6 left-6 z-50 flex items-center gap-3 rounded-2xl bg-neutral-900 px-5 py-4 shadow-xl transition-all duration-500 ${
-          notifVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0 pointer-events-none'
-        }`}
-      >
-        <span className="text-3xl">{notification?.emoji}</span>
-        <div>
-          <p className="text-xs font-medium text-neutral-400">Achievement unlocked</p>
-          <p className="text-sm font-bold text-white">{notification?.label}</p>
-        </div>
-      </div>
-
-      {/* Badges modal */}
-      {badgesOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setBadgesOpen(false)}
-        >
-          <div
-            className="relative w-full max-w-md rounded-3xl bg-white px-8 py-8 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setBadgesOpen(false)}
-              className="absolute right-4 top-4 rounded-lg p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
-                <path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-              </svg>
-            </button>
-
-            <h2 className="mb-6 text-xl font-bold text-neutral-900">Your Badges</h2>
-
-            <div className="grid grid-cols-3 gap-4">
-              {BADGES.map((badge) => {
-                const unlocked = badge.condition(dailyStreak, unlockedLevel);
-                return (
-                  <div key={badge.label} className="group relative">
-                    <div
-                      className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition ${
-                        unlocked
-                          ? 'border-neutral-200 bg-neutral-50'
-                          : 'border-neutral-100 bg-neutral-100 opacity-40 grayscale'
-                      }`}
-                    >
-                      <span className="text-4xl">{badge.emoji}</span>
-                      <span className="text-center text-xs font-medium text-neutral-600">{badge.label}</span>
-                    </div>
-                    {/* Tooltip */}
-                    <div className="pointer-events-none absolute -top-10 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-3 py-1.5 text-xs text-white opacity-0 shadow-lg transition group-hover:opacity-100">
-                      {badge.description}
-                      <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-neutral-900" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <header className="flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
-        <img src={studyonLogo} alt="Studyon logo" className="h-14 w-14 object-contain brightness-0 invert" />
+      <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+        <img
+          src={studyonLogo}
+          alt="Studyon logo"
+          className="h-14 w-14 object-contain brightness-0 invert"
+        />
         <button
           type="button"
           onClick={() => navigate('/streak')}
           className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
+          aria-label="Open streak page"
         >
-          <span className="text-3xl leading-none">{'\u{1F525}'}</span>
+          <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
           <span className="text-xl font-semibold text-orange-400">{dailyStreak} days</span>
         </button>
-        <button
-          type="button"
-          onClick={() => setBadgesOpen(true)}
-          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-yellow-400 transition hover:bg-neutral-950/60"
-        >
-          <span className="text-3xl leading-none">🎖️</span>
-          <span className="text-xl font-semibold text-yellow-400">Badges</span>
-        </button>
-        <div className="ml-auto">
+        <div className="ml-8 flex items-center gap-3 lg:ml-12">
+          <button
+            type="button"
+            onClick={() => updateLevel('reset')}
+            disabled={levelLoading}
+            className="rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset Level
+          </button>
+          {completedStages.length < levels.length && (
+            <button
+              type="button"
+              onClick={() => updateLevel('progress')}
+              disabled={levelLoading}
+              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Progress Level
+            </button>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
+            {showTopbarBadgerButton && (
+              <button
+                type="button"
+                onClick={openAssistant}
+                className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+                aria-label="Show AI Assistant"
+              >
+                <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
+                {showTopbarBadgerImage && (
+                  <img
+                    src={badgerImage}
+                    alt="Badger"
+                    className="h-full w-full rounded-[15%] object-cover"
+                  />
+                )}
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => { logout(); navigate('/login'); }}
             className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+            aria-label="Logout"
           >
             <span className="text-sm font-medium">Logout</span>
           </button>
         </div>
       </header>
 
-      <main className="flex min-h-[90vh]">
-        <section className="flex min-w-0 flex-1 flex-col">
+      <main
+        className="min-h-screen pt-[max(10vh,72px)] transition-[padding-right] duration-200"
+        style={{ paddingRight: assistantOpen ? assistantPanelWidth : '0px' }}
+      >
+        <section className="flex min-h-[calc(100vh-max(10vh,72px))] min-w-0 flex-col">
           <div className="flex h-[10vh] min-h-[88px] items-center border-b border-neutral-300 bg-neutral-100 px-4 sm:px-6 lg:px-8">
             <div
               ref={roadmapRef}
@@ -256,27 +485,44 @@ export default function Layout() {
                 <div className="absolute left-6 right-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-200" />
                 <div
                   className="absolute left-6 top-1/2 h-2 -translate-y-1/2 rounded-full bg-neutral-700 transition-all"
-                  style={{ width: `calc((100% - 3rem) * ${Math.max(0, (unlockedLevel - 1) / (levels.length - 1))})` }}
+                  style={{
+                    width: `calc((100% - 3rem) * ${Math.max(0, (furthestUnlockedLevel - 1) / (levels.length - 1))})`,
+                  }}
                 />
+
                 <div className="relative flex h-12 w-full flex-nowrap items-center justify-between gap-3 px-1 sm:gap-4">
                   {levels.map((level) => {
                     const isActive = level === activeLevel;
-                    const isUnlocked = level <= unlockedLevel;
+                    const isUnlocked = isLevelUnlocked(level, completedStages);
+                    const isCompleted = completedStages.includes(level);
+
                     return (
                       <button
                         key={level}
                         type="button"
-                        onClick={() => isUnlocked && setActiveLevel(level)}
+                        onClick={() => isUnlocked && void handleLevelSelect(level)}
                         disabled={!isUnlocked}
                         className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
-                          isUnlocked
+                          isCompleted
                             ? isActive
-                              ? 'border-neutral-800 bg-neutral-800 text-white'
-                              : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
-                            : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
+                              ? 'border-green-600 bg-green-600 text-white'
+                              : 'border-green-500 bg-green-50 text-green-600 hover:bg-green-100'
+                            : isUnlocked
+                              ? isActive
+                                ? 'border-neutral-800 bg-neutral-800 text-white'
+                                : 'border-neutral-300 bg-neutral-50 text-neutral-700 hover:border-neutral-500 hover:bg-white'
+                              : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
                         }`}
+                        aria-pressed={isActive}
+                        aria-label={isUnlocked ? `Show level ${level}` : `Level ${level} is locked`}
                       >
-                        {isUnlocked ? level : (
+                        {isCompleted ? (
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                            <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+                          </svg>
+                        ) : isUnlocked ? (
+                          level
+                        ) : (
                           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-current">
                             <path d="M16 10V8a4 4 0 1 0-8 0v2H7v10h10V10h-1Zm-6-2a2 2 0 1 1 4 0v2h-4V8Zm5 10H9v-6h6v6Z" />
                           </svg>
@@ -289,68 +535,134 @@ export default function Layout() {
             </div>
           </div>
 
-          <div className="flex-1 bg-white px-8 py-8">
-            <div className="flex h-full min-h-[320px] flex-col rounded-[2.5rem] bg-neutral-200/70 px-8 py-8">
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => updateLevel('reset')}
-                  disabled={levelLoading}
-                  className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Reset Level
-                </button>
-                {activeLevel !== 7 && (
-                  <button
-                    type="button"
-                    onClick={() => updateLevel('progress')}
-                    disabled={levelLoading}
-                    className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Progress Level
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-1 items-center justify-center">
-                <p className="text-[clamp(7rem,20vw,16rem)] font-bold leading-none text-neutral-400/70">{activeLevel}</p>
-              </div>
+          <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
+            <div className="flex min-h-full flex-1 rounded-md bg-neutral-200/70 p-3">
+              {activeLevel === 2 && <Level2 />}
+              {activeLevel === 6 && (
+                levelSixCorrecting ? (
+                  levelSixFile ? (
+                    <DocumentReview
+                      file={levelSixFile}
+                      onChangeDocument={resetLevelSixFileState}
+                      assistantOpen={assistantOpen}
+                    />
+                  ) : null
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+                    <div className="w-full text-left">
+                      <h2 className="text-3xl font-semibold text-neutral-800">Writing</h2>
+                      <p className="mt-1 text-sm text-neutral-500">Get Feedback from our Badger AI</p>
+                    </div>
+                    <label
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setLevelSixDragging(true);
+                      }}
+                      onDragLeave={() => setLevelSixDragging(false)}
+                      onDrop={handleLevelSixDrop}
+                      className={`group flex h-[80%] w-full cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-6 text-center transition ${
+                        levelSixDragging
+                          ? 'border-neutral-600 bg-neutral-100'
+                          : 'border-neutral-300 bg-white'
+                      }`}
+                    >
+                      <input
+                        ref={levelSixFileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,.rtf"
+                        onChange={handleLevelSixFileChange}
+                        className="hidden"
+                      />
+                      <span className="text-lg font-medium text-neutral-700">
+                        Drag to insert file
+                      </span>
+                      <span className="mt-2 text-sm text-neutral-400">
+                        PDF, DOC, DOCX, TXT, RTF
+                      </span>
+                      <span className="mt-5 rounded-full border border-neutral-300 bg-neutral-50 px-5 py-2 text-sm font-medium text-neutral-600 transition group-hover:border-neutral-400 group-hover:bg-neutral-100">
+                        Choose file
+                      </span>
+                      {levelSixFile && (
+                        <span className="mt-4 rounded-full bg-neutral-100 px-4 py-2 text-sm text-neutral-700">
+                          {levelSixFile.name}
+                        </span>
+                      )}
+                    </label>
+                    {levelSixFile && (
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setLevelSixCorrecting(true)}
+                          className="rounded-full bg-neutral-900 px-10 py-4 text-base font-semibold text-white shadow-[0_18px_40px_-20px_rgba(23,23,23,0.95)] transition hover:bg-neutral-800"
+                        >
+                          Correct
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
             </div>
             <Outlet />
           </div>
         </section>
 
-        <div className="relative flex">
-          {!assistantOpen && (
-            <button
-              onClick={() => setAssistantOpen(true)}
-              className="absolute -left-12 top-1/2 z-10 -translate-y-1/2 overflow-hidden rounded-full shadow-lg transition hover:shadow-xl"
-            >
-              <img src={badgerImage} alt="Badger" className="h-20 w-20 object-cover" />
-            </button>
-          )}
-          {assistantOpen && (
-            <aside className="h-[90vh] min-h-[540px] w-[320px] shrink-0 border-l border-neutral-200 bg-white px-3 pl-4 py-8 text-neutral-900 lg:w-[380px]">
-              <div className="relative flex justify-center">
-                <img src={badgerImage} alt="Badger" className="h-24 w-24 rounded-full object-cover" />
-                <button
-                  onClick={() => setAssistantOpen(false)}
-                  className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
-                    <path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-              <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
-                <AiAssistant />
-              </div>
-            </aside>
-          )}
-        </div>
       </main>
+
+      {assistantOpen && (
+        <aside
+          className="fixed right-0 z-20 border-l border-neutral-200 bg-white px-3 py-8 pl-4 text-neutral-900"
+          style={{
+            top: topbarHeight,
+            height: `calc(100vh - ${topbarHeight})`,
+            width: assistantPanelWidth,
+          }}
+        >
+          <div className="relative flex justify-center">
+            <div className="flex justify-center">
+              <img
+                ref={assistantBadgerRef}
+                src={badgerImage}
+                alt="Badger"
+                className="h-24 w-24 rounded-full object-cover"
+              />
+            </div>
+            <button
+              onClick={closeAssistant}
+              className="absolute left-0 -top-6 rounded-lg p-4 text-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              aria-label="Close AI Assistant"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5">
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="mt-4 h-[calc(100%-6rem)] min-h-[280px]">
+            <AiAssistant />
+          </div>
+        </aside>
+      )}
+
+      {badgerTransition && (
+        <div
+          className="pointer-events-none fixed z-40 overflow-hidden rounded-[15%] transition-[top,left,width,height] duration-300 ease-out"
+          style={badgerTransitionStyle}
+          aria-hidden="true"
+        >
+          <img
+            src={badgerImage}
+            alt=""
+            className="h-full w-full rounded-[15%] object-cover shadow-[0_18px_40px_-20px_rgba(23,23,23,0.85)]"
+          />
+        </div>
+      )}
     </div>
   );
 }
-
-
 
