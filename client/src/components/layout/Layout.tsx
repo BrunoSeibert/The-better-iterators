@@ -724,7 +724,7 @@ const closeAssistant = () => {
         className="min-h-screen pt-[max(10vh,72px)] transition-[padding-right] duration-200"
         style={{ paddingRight: assistantOpen ? assistantPanelWidth : '0px' }}
       >
-        <section className={`flex min-w-0 flex-col ${activeLevel === 6 ? 'min-h-[calc(100vh-max(10vh,72px))]' : 'h-[calc(100vh-max(10vh,72px))]'}`}>
+        <section className="flex min-w-0 flex-col min-h-[calc(100vh-max(10vh,72px))]">
           <div className="flex h-[10vh] min-h-[88px] items-center border-b border-neutral-300 bg-neutral-100 px-4 sm:px-6 lg:px-8">
             <div
               ref={roadmapRef}
@@ -801,14 +801,14 @@ const closeAssistant = () => {
             </div>
           )}
 
-          <div className={`flex bg-white px-2 py-2 sm:px-3 sm:py-3 ${activeLevel === 6 ? 'min-h-0 flex-1 overflow-visible' : 'min-h-0 flex-1 overflow-hidden'}`}>
+          <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3 overflow-visible">
             <div
-              className={`flex flex-1 min-h-0 rounded-md ${
+              className={`flex flex-1 rounded-md ${
                 levelSixCorrecting || activeLevel === 2
-                  ? 'bg-transparent p-0 overflow-y-auto overflow-x-hidden'
+                  ? 'bg-transparent p-0 overflow-visible'
                   : activeLevel === 6
                     ? 'bg-neutral-200/70 p-3 overflow-visible'
-                  : 'bg-neutral-200/70 p-3 overflow-y-auto'
+                  : 'bg-neutral-200/70 p-3 overflow-visible'
               }`}
             >
               {activeLevel === 1 && <LiteratureReview />}
