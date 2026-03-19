@@ -6,6 +6,7 @@ import { AuthRequest } from '../middleware/auth';
 const router = Router();
 
 router.get('/by-university', requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const userId = (req as AuthRequest).userId;
 
@@ -16,13 +17,17 @@ router.get('/by-university', requireAuth, async (req, res) => {
 
     const universityId = userResult.rows[0]?.university_id ?? null;
     const fieldIds: string[] = userResult.rows[0]?.interests ?? [];
+    const ignoreInterests = req.query.all === 'true';
+
+    if (!universityId) {
+      return res.json({ topics: [] });
+    }
 
     const result = await db.query(
-      `SELECT * FROM topics
-       WHERE "universityId" = $1
-         AND (cardinality($2::text[]) = 0 OR "fieldIds" && $2::text[])
-       ORDER BY id`,
-      [universityId, fieldIds]
+      ignoreInterests
+        ? `SELECT * FROM topics WHERE "universityId" = $1 ORDER BY id`
+        : `SELECT * FROM topics WHERE "universityId" = $1 AND (cardinality($2::text[]) = 0 OR "fieldIds" && $2::text[]) ORDER BY id`,
+      ignoreInterests ? [universityId] : [universityId, fieldIds]
     );
 
     const parseArr = (v: unknown): string[] => {

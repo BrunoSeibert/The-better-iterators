@@ -18,6 +18,9 @@ import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
 import { useAuthStore } from '@/store/authStore';
 import * as authService from '@/services/authService';
+import AchievementToast from '../AchievementToast';
+import { BADGES } from '@/utils/badges';
+
 
 const levels = Array.from({ length: 7 }, (_, index) => index + 1);
 const topbarHeight = 'max(10vh, 72px)';
@@ -29,6 +32,7 @@ type RectState = {
   width: number;
   height: number;
 };
+
 
 const UNLOCK_DEPS: Record<number, number[]> = {
   1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
@@ -91,6 +95,10 @@ export default function Layout() {
     scrollLeft: 0,
   });
 
+  const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
+  const prevUnlockedRef = useRef<Set<string>>(new Set());
+  const isInitializedRef = useRef(false); 
+
   const refreshLevelState = useCallback(
     async (requestedActiveLevel?: number) => {
       const { user: refreshedUser } = await authService.me();
@@ -107,6 +115,22 @@ export default function Layout() {
 
       setUser(refreshedUser);
       setActiveLevel(nextActiveLevel);
+
+      if (!isInitializedRef.current) {
+        const level = refreshedUser.currentLevel ?? 0;
+        let streak = 0;
+        try {
+          const summary = await authService.getStreakSummary();
+          streak = summary.currentStreak;
+        } catch {
+          streak = 0;
+        }
+        prevUnlockedRef.current = new Set(
+          BADGES.filter((b) => b.condition(streak, level)).map((b) => b.label)
+        );
+        isInitializedRef.current = true;
+    }
+
 
       return {
         user: refreshedUser,
@@ -250,6 +274,26 @@ export default function Layout() {
       isMounted = false;
     };
   }, []);
+
+  const level = user?.currentLevel ?? 0;
+
+  useEffect(() => {
+    if (!isInitializedRef.current) return;
+    
+    const newlyUnlocked = BADGES.filter((badge) => {
+      const isUnlocked = badge.condition(dailyStreak, level);
+      const wasUnlocked = prevUnlockedRef.current.has(badge.label);
+      return isUnlocked && !wasUnlocked;
+    });
+
+    prevUnlockedRef.current = new Set(
+      BADGES.filter((b) => b.condition(dailyStreak, level)).map((b) => b.label)
+    );
+
+    if (newlyUnlocked.length > 0) {
+      setAchievementQueue((prev) => [...prev, ...newlyUnlocked]);
+    }
+  }, [dailyStreak, level]);
 
   const updateLevel = async (action: 'reset' | 'progress') => {
     if (levelLoading) {
@@ -436,34 +480,38 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
-            {showTopbarBadgerButton && (
-              <button
-                type="button"
-                onClick={openAssistant}
-                className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
-                aria-label="Show AI Assistant"
-              >
-                <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
-                {showTopbarBadgerImage && (
-                  <img
-                    src={badgerImage}
-                    alt="Badger"
-                    className="h-full w-full rounded-[15%] object-cover"
-                  />
-                )}
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => { logout(); navigate('/login'); }}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
-            aria-label="Logout"
-          >
-            <span className="text-sm font-medium">Logout</span>
-          </button>
+        <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
+          {showTopbarBadgerButton && (
+            <button
+              type="button"
+              onClick={openAssistant}
+              className="relative h-full w-full overflow-hidden rounded-[15%] border border-neutral-800 bg-neutral-900 p-1 transition hover:bg-neutral-800"
+              aria-label="Show AI Assistant"
+            >
+              <span className="absolute left-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500" />
+              {showTopbarBadgerImage && (
+                <img
+                  src={badgerImage}
+                  alt="Badger"
+                  className="h-full w-full rounded-[15%] object-cover"
+                />
+              )}
+            </button>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          aria-label="Profile"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z"/>
+          </svg>
+          <span className="text-sm font-medium">Profile</span>
+        </button>
+      </div>
+
       </header>
 
       <main
@@ -664,6 +712,19 @@ export default function Layout() {
           />
         </div>
       )}
+      <div className="pointer-events-none fixed bottom-6 left-6 z-50 flex flex-col gap-3">
+        {achievementQueue.slice(0, 3).map((badge) => (
+          <AchievementToast
+            key={badge.label}
+            emoji={badge.emoji}
+            label={badge.label}
+            description={badge.description}
+            onDone={() =>
+              setAchievementQueue((prev) => prev.filter((b) => b.label !== badge.label))
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }

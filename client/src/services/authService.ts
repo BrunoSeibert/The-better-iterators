@@ -61,8 +61,8 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
-export async function getTopicsByUniversity() {
-  const res = await api.get('/topics/by-university');
+export async function getTopicsByUniversity(all = false) {
+  const res = await api.get(all ? '/topics/by-university?all=true' : '/topics/by-university');
   return res.data as {
     topics: {
       id: string;
