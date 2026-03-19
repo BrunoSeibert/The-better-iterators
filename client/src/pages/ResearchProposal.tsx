@@ -3,8 +3,10 @@ import {
   proposalTopicFeedback,
   proposalSectionFeedback,
   proposalGenerateFinal,
+  logActivity,
   type ProposalMessage,
 } from '@/services/authService';
+import { useAuthStore } from '@/store/authStore';
 
 // ── persistence helpers ──────────────────────────────────────────────────────
 function load<T>(key: string): T | null {
@@ -98,13 +100,16 @@ const DEFAULT_STATE: ProposalState = {
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function ResearchProposal() {
-  const [state, setState] = useState<ProposalState>(() => load('proposal_state') ?? DEFAULT_STATE);
+  const userId = useAuthStore((s) => s.user?.id ?? 'anon');
+  const k = (key: string) => `${userId}:${key}`;
+
+  const [state, setState] = useState<ProposalState>(() => load(k('proposal_state')) ?? DEFAULT_STATE);
   const [loading, setLoading] = useState(false);
   const [followUp, setFollowUp] = useState('');
   const [generating, setGenerating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { save('proposal_state', state); }, [state]);
+  useEffect(() => { save(k('proposal_state'), state); }, [state]);
 
   const step = state.step;
   const meta = STEP_META[step];
@@ -115,7 +120,7 @@ export default function ResearchProposal() {
     : state.sections[SECTION_KEYS[step - 1]]?.content ?? '';
 
   const currentFeedback = step === 0
-    ? (load<FeedbackEntry[]>('proposal_topic_feedback') ?? [])
+    ? (load<FeedbackEntry[]>(k('proposal_topic_feedback')) ?? [])
     : state.sections[SECTION_KEYS[step - 1]]?.feedback ?? [];
 
   // ── setters ─────────────────────────────────────────────────────────────────
@@ -137,8 +142,8 @@ export default function ResearchProposal() {
 
   const appendFeedback = (entry: FeedbackEntry) => {
     if (step === 0) {
-      const prev = load<FeedbackEntry[]>('proposal_topic_feedback') ?? [];
-      save('proposal_topic_feedback', [...prev, entry]);
+      const prev = load<FeedbackEntry[]>(k('proposal_topic_feedback')) ?? [];
+      save(k('proposal_topic_feedback'), [...prev, entry]);
     } else {
       const key = SECTION_KEYS[step - 1];
       setState((s) => ({
@@ -168,12 +173,14 @@ export default function ResearchProposal() {
       if (step === 0) {
         const result = await proposalTopicFeedback(state.topic.title, state.topic.description, existingMessages);
         appendFeedback({ role: 'ai', ...result });
+        logActivity('Got AI feedback on research topic', 3, 0);
       } else {
         const key = SECTION_KEYS[step - 1];
         const allSections: Record<string, string> = {};
         SECTION_KEYS.forEach((k) => { allSections[k] = state.sections[k].content; });
         const result = await proposalSectionFeedback(key, currentContent, allSections, existingMessages);
         appendFeedback({ role: 'ai', ...result });
+        logActivity(`Got AI feedback on proposal ${key}`, 3, step);
       }
 
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -195,6 +202,8 @@ export default function ResearchProposal() {
 
   const handleNext = async () => {
     if (step < 5) {
+      const stepLabels = ['topic', 'research question', 'motivation', 'approach', 'expected outcome'];
+      logActivity(`Completed proposal step: ${stepLabels[step]}`, 3, step);
       setState((s) => ({ ...s, step: s.step + 1 }));
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     }
@@ -209,6 +218,7 @@ export default function ResearchProposal() {
           outcome: state.sections.outcome.content,
         });
         setState((s) => ({ ...s, finalProposal: result, step: 5 }));
+        logActivity('Generated final research proposal', 3, 5);
       } finally {
         setGenerating(false);
       }
@@ -230,11 +240,11 @@ export default function ResearchProposal() {
 
   const resetProposal = () => {
     setState(DEFAULT_STATE);
-    save('proposal_topic_feedback', []);
+    save(k('proposal_topic_feedback'), []);
   };
 
   // ── render topic feedback (loaded from sessionStorage for step 0) ──────────
-  const topicFeedback = load<FeedbackEntry[]>('proposal_topic_feedback') ?? [];
+  const topicFeedback = load<FeedbackEntry[]>(k('proposal_topic_feedback')) ?? [];
   const renderedFeedback = step === 0 ? topicFeedback : currentFeedback;
 
   // ── final loading ─────────────────────────────────────────────────────────

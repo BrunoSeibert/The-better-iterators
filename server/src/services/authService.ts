@@ -84,6 +84,20 @@ export async function login(email: string, password: string) {
   return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] }, token };
 }
 
+const LEVEL_WEIGHTS = [0.15, 0.25, 0.40, 0.55, 0.80, 1.0];
+
+function computeLevelDeadlines(mainDeadline: string): Record<number, string> {
+  const today = new Date();
+  const d = new Date(mainDeadline);
+  const totalMs = d.getTime() - today.getTime();
+  const result: Record<number, string> = {};
+  LEVEL_WEIGHTS.forEach((w, i) => {
+    result[i + 1] = new Date(today.getTime() + totalMs * w).toISOString().slice(0, 10);
+  });
+  result[6] = d.toISOString().slice(0, 10);
+  return result;
+}
+
 export async function completeOnboarding(
   userId: string,
   currentLevel: number,
@@ -91,15 +105,25 @@ export async function completeOnboarding(
   universityId: string,
   studyProgramId: string,
   degreeType: string,
-  fieldIds: string[]
+  fieldIds: string[],
+  mainDeadline?: string
 ) {
+  const levels = mainDeadline ? computeLevelDeadlines(mainDeadline) : null;
   const result = await db.query(
     `UPDATE "User"
      SET is_onboarded = TRUE, current_level = $1, completed_stages = $2::int[],
-         university_id = $3, study_program_id = $4, degree_type = $5, interests = $6::text[]
-     WHERE id = $7
+         university_id = $3, study_program_id = $4, degree_type = $5, interests = $6::text[],
+         main_deadline = $7, level1_deadline = $8, level2_deadline = $9, level3_deadline = $10,
+         level4_deadline = $11, level5_deadline = $12, level6_deadline = $13
+     WHERE id = $14
      RETURNING id, name, email, is_onboarded, current_level, completed_stages`,
-    [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
+    [
+      currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds,
+      mainDeadline ?? null,
+      levels?.[1] ?? null, levels?.[2] ?? null, levels?.[3] ?? null,
+      levels?.[4] ?? null, levels?.[5] ?? null, levels?.[6] ?? null,
+      userId,
+    ]
   );
   return { token: signToken(result.rows[0]) };
 }

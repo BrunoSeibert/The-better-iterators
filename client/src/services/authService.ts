@@ -405,7 +405,41 @@ export async function completeOnboarding(data: {
   studyProgramId: string;
   degreeType: string;
   fieldIds: string[];
+  mainDeadline?: string;
 }) {
   const res = await api.patch('/auth/complete-onboarding', data);
   return res.data;
+}
+
+export type Todo = { id: string; text: string; done: boolean; level_link: number | null; created_at: string };
+export type ActivityEntry = { id: string; action: string; level: number | null; step_context: number | null; created_at: string };
+export type DashboardDeadlines = { main: string | null; level1: string | null; level2: string | null; level3: string | null; level4: string | null; level5: string | null; level6: string | null };
+export type DashboardData = {
+  user: { name: string; completedStages: number[]; currentLevel: number };
+  deadlines: DashboardDeadlines;
+  todos: Todo[];
+  recentActivity: ActivityEntry[];
+};
+
+export async function getDashboard(): Promise<DashboardData> {
+  const res = await api.get('/dashboard');
+  return res.data;
+}
+export async function updateMainDeadline(mainDeadline: string) {
+  const res = await api.patch('/dashboard/deadline', { mainDeadline });
+  return res.data as { mainDeadline: string; levels: Record<number, string> };
+}
+export async function createTodo(text: string, levelLink?: number) {
+  const res = await api.post('/dashboard/todos', { text, levelLink });
+  return res.data as Todo;
+}
+export async function toggleTodo(id: string, done: boolean) {
+  const res = await api.patch(`/dashboard/todos/${id}`, { done });
+  return res.data as Todo;
+}
+export async function deleteTodo(id: string) {
+  await api.delete(`/dashboard/todos/${id}`);
+}
+export async function logActivity(action: string, level?: number, stepContext?: number) {
+  await api.post('/dashboard/activity', { action, level, stepContext });
 }

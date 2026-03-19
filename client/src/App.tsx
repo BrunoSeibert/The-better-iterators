@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import Profile from './pages/Profile';
 import TopicDetailPage from '@/pages/TopicDetailPage';
 import ExploreOtherTopics from '@/pages/ExploreOtherTopics';
+import Dashboard from '@/pages/Dashboard';
 
 function ProtectedRoute() {
   const { token, user } = useAuthStore((state) => state);
@@ -21,7 +22,7 @@ function OnboardingRoute() {
   const { token, user } = useAuthStore((state) => state);
 
   if (!token) return <Navigate to="/" replace />;
-  if (user?.isOnboarded) return <Navigate to="/app" replace />;
+  if (user?.isOnboarded) return <Navigate to="/dashboard" replace />;
 
   return <Outlet />;
 }
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/onboarding" element={<OnboardingPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/app" element={<Layout />} />
         <Route path="/streak" element={<StreakPage />} />
         <Route path="/profile" element={<Profile />} />

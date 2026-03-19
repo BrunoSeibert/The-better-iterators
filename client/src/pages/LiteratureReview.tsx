@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { literatureStart, literatureAnalyze, literatureSuggestTopics, type Phase1Data, type PaperAnalysis, type TopicSuggestion } from '@/services/authService';
+import { literatureStart, literatureAnalyze, literatureSuggestTopics, logActivity, type Phase1Data, type PaperAnalysis, type TopicSuggestion } from '@/services/authService';
+import { useAuthStore } from '@/store/authStore';
 
 function load<T>(key: string): T | null {
   try { const v = sessionStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
@@ -10,32 +11,35 @@ function save(key: string, value: unknown) {
 }
 
 export default function LiteratureReview() {
-  const [phase1, setPhase1] = useState<Phase1Data | null>(() => load('lit_phase1'));
-  const [loadingPhase1, setLoadingPhase1] = useState(load('lit_phase1') === null);
+  const userId = useAuthStore((s) => s.user?.id ?? 'anon');
+  const k = (key: string) => `${userId}:${key}`;
+
+  const [phase1, setPhase1] = useState<Phase1Data | null>(() => load(k('lit_phase1')));
+  const [loadingPhase1, setLoadingPhase1] = useState(load(k('lit_phase1')) === null);
   const [phase1Error, setPhase1Error] = useState<string | null>(null);
 
-  const [papers, setPapers] = useState<PaperAnalysis[]>(() => load('lit_papers') ?? []);
-  const [feedback, setFeedback] = useState<Record<number, 'liked' | 'disliked'>>(() => load('lit_feedback') ?? {});
+  const [papers, setPapers] = useState<PaperAnalysis[]>(() => load(k('lit_papers')) ?? []);
+  const [feedback, setFeedback] = useState<Record<number, 'liked' | 'disliked'>>(() => load(k('lit_feedback')) ?? {});
   const [input, setInput] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  const [suggestions, setSuggestions] = useState<TopicSuggestion[] | null>(() => load('lit_suggestions'));
+  const [suggestions, setSuggestions] = useState<TopicSuggestion[] | null>(() => load(k('lit_suggestions')));
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { save('lit_papers', papers); }, [papers]);
-  useEffect(() => { save('lit_feedback', feedback); }, [feedback]);
-  useEffect(() => { save('lit_suggestions', suggestions); }, [suggestions]);
+  useEffect(() => { save(k('lit_papers'), papers); }, [papers]);
+  useEffect(() => { save(k('lit_feedback'), feedback); }, [feedback]);
+  useEffect(() => { save(k('lit_suggestions'), suggestions); }, [suggestions]);
 
   useEffect(() => {
     if (phase1) return; // already restored from sessionStorage
     let cancelled = false;
     literatureStart()
-      .then((res) => { if (!cancelled) { setPhase1(res); save('lit_phase1', res); setLoadingPhase1(false); } })
+      .then((res) => { if (!cancelled) { setPhase1(res); save(k('lit_phase1'), res); setLoadingPhase1(false); } })
       .catch((err) => { if (!cancelled) { setPhase1Error(err.message ?? 'Failed to load'); setLoadingPhase1(false); } });
     return () => { cancelled = true; };
   }, []);
@@ -46,6 +50,7 @@ export default function LiteratureReview() {
     try {
       const result = await literatureSuggestTopics(papers, feedback);
       setSuggestions(result);
+      logActivity('Generated topic suggestions from literature review', 1);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (err: any) {
       setSuggestError(err.message ?? 'Failed to load suggestions');
@@ -61,6 +66,7 @@ export default function LiteratureReview() {
     try {
       const result = await literatureAnalyze(input.trim(), papers, feedback);
       setPapers((prev) => [...prev, result]);
+      logActivity(`Analyzed paper: ${result.input.slice(0, 60)}${result.input.length > 60 ? '…' : ''}`, 1);
       setInput('');
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (err: any) {

@@ -25,8 +25,8 @@ const THESIS_STAGES = [
   { label: "I'm preparing for my defense",              getCompleted: () => [1, 2, 3, 4, 5, 6] },
 ];
 
-type Step = 'info' | 'interests' | 'advisor' | 'stage';
-const STEP_ORDER: Step[] = ['info', 'interests', 'advisor', 'stage'];
+type Step = 'info' | 'interests' | 'advisor' | 'stage' | 'deadline';
+const STEP_ORDER: Step[] = ['info', 'interests', 'advisor', 'stage', 'deadline'];
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -55,6 +55,12 @@ export default function OnboardingPage() {
   // Step 3
   const [hasAdvisor, setHasAdvisor] = useState<boolean | null>(null);
 
+  // Step 4 (stored for use in step 5)
+  const [pendingStages, setPendingStages] = useState<{ currentLevel: number; completedStages: number[] } | null>(null);
+
+  // Step 5
+  const [mainDeadline, setMainDeadline] = useState('');
+
   const stepIndex = STEP_ORDER.indexOf(step);
   const progress = ((stepIndex + 1) / STEP_ORDER.length) * 100;
 
@@ -78,13 +84,23 @@ export default function OnboardingPage() {
     if (prev) setStep(prev);
   }
 
-  async function handleStageSelect(completedStages: number[]) {
+  function handleStageSelect(completedStages: number[]) {
     const currentLevel = completedStages.length > 0 ? Math.max(...completedStages) : 0;
+    setPendingStages({ currentLevel, completedStages });
+    setStep('deadline');
+  }
+
+  async function handleDeadlineSubmit() {
+    if (!pendingStages) return;
     setLoading(true);
     try {
-      const result = await authService.completeOnboarding({ currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds });
+      const { currentLevel, completedStages } = pendingStages;
+      const result = await authService.completeOnboarding({
+        currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds,
+        mainDeadline: mainDeadline || undefined,
+      });
       setAuth({ ...user!, isOnboarded: true, currentLevel, completedStages }, result.token);
-      navigate('/app');
+      navigate('/dashboard');
     } catch {
       setError('Something went wrong. Please try again.');
       setLoading(false);
@@ -289,6 +305,39 @@ export default function OnboardingPage() {
                   {s.label}
                 </button>
               ))}
+            </div>
+            <button onClick={goBack} className="mt-6 ds-small hover:underline" style={{ color: 'var(--muted-foreground)' }}>
+              ← Back
+            </button>
+          </>
+        )}
+
+        {/* Step 5: Thesis Deadline */}
+        {step === 'deadline' && (
+          <>
+            <h1 className="ds-title-xl font-light text-[--foreground] mb-3 text-center">
+              When is your thesis due?
+            </h1>
+            <p className="ds-body text-center mb-8" style={{ color: 'var(--muted-foreground)' }}>
+              We'll suggest deadlines for each level to keep you on track.
+            </p>
+            <div className="w-full space-y-4">
+              <input
+                type="date"
+                value={mainDeadline}
+                onChange={(e) => setMainDeadline(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="w-full border rounded-2xl px-5 py-4 ds-body focus:outline-none focus:ring-2 focus:ring-gray-300"
+                style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
+              />
+              <button
+                onClick={handleDeadlineSubmit}
+                disabled={loading}
+                className="w-full py-4 rounded-2xl ds-label text-base transition hover:opacity-90 disabled:opacity-40"
+                style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              >
+                {loading ? 'Setting up…' : mainDeadline ? "Let's go →" : 'Skip for now →'}
+              </button>
             </div>
             <button onClick={goBack} className="mt-6 ds-small hover:underline" style={{ color: 'var(--muted-foreground)' }}>
               ← Back

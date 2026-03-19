@@ -529,10 +529,21 @@ export default function Layout() {
         </div>
       )}
       <header className="fixed inset-x-0 top-0 z-30 flex h-[10vh] min-h-[72px] items-center justify-start bg-black px-4 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          aria-label="Back to Dashboard"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/>
+          </svg>
+          <span className="text-sm font-medium">Dashboard</span>
+        </button>
         <img
           src={studyonLogo}
           alt="Studyon logo"
-          className="h-12 w-12 object-contain brightness-0 invert"
+          className="h-12 w-12 object-contain brightness-0 invert ml-2"
         />
         <button
           type="button"

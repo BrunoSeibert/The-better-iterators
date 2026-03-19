@@ -37,7 +37,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (token) {
-      navigate('/app');
+      navigate('/dashboard');
     }
   }, [navigate, token]);
 
@@ -56,7 +56,7 @@ export default function LoginPage() {
       setError('');
       const result = await authService.login(email, data.password);
       setAuth(result.user, result.token);
-      navigate(result.user.isOnboarded ? '/app' : '/onboarding');
+      navigate(result.user.isOnboarded ? '/dashboard' : '/onboarding');
     } catch {
       setError('Invalid email or password');
     }

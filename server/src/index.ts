@@ -30,6 +30,9 @@ import proposalRoutes from './routes/proposal';
 import researchRoutes from './routes/research';
 import { speechRouter } from './routes/speech';
 import presentationTestRoutes from './routes/presentationTest';
+import dashboardRoutes from './routes/dashboard';
+import { runMigrations } from './migrate';
+runMigrations().catch(console.error);
 
 app.use('/api/map', mapRoutes);
 app.use('/api/chat', chatRouter);
@@ -43,6 +46,7 @@ app.use('/api/proposal', proposalRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/speech', speechRouter);
 app.use('/api/presentation-test', presentationTestRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
