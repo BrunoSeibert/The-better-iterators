@@ -911,7 +911,7 @@ const closeAssistant = () => {
                 ✕
               </button>
             </div>
-            <DailyCheckin onComplete={() => setCheckinOpen(false)} />
+            <DailyCheckin onComplete={() => {}} />
           </div>
         </div>
       )}
