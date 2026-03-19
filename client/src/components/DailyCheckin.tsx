@@ -36,14 +36,14 @@ const TIME_OPTIONS = ['20 min', '1h', '2h', 'half day', 'full day'];
 
 // App colour tokens
 const C = {
-  darkBrown:  'rgba(81,60,45,1)',
-  midBrown:   'rgba(114,96,84,1)',
-  tan:        'rgba(197,171,146,1)',
-  lightTan:   'rgba(231,214,194,1)',
-  cream:      'rgba(252,248,243,1)',
-  warmWhite:  'rgba(245,239,231,1)',
-  border:     'rgba(196,177,160,1)',
-  mutedText:  'rgba(140,115,95,1)',
+  darkBrown:  'rgba(38,38,38,1)',
+  midBrown:   'rgba(82,82,91,1)',
+  tan:        'rgba(161,161,170,1)',
+  lightTan:   'rgba(228,228,231,1)',
+  cream:      'rgba(250,250,250,1)',
+  warmWhite:  'rgba(244,244,245,1)',
+  border:     'rgba(212,212,216,1)',
+  mutedText:  'rgba(113,113,122,1)',
 };
 
 const layeredMascotStyle: React.CSSProperties = {
@@ -286,7 +286,7 @@ export default function DailyCheckin({ onComplete }: Props) {
                   transform:        active ? 'scale(1.12)' : 'scale(1)',
                   transition:       'all 0.15s ease',
                   cursor:           'pointer',
-                  boxShadow:        active ? `0 2px 6px rgba(81,60,45,0.35)` : 'none',
+                  boxShadow:        active ? `0 2px 6px rgba(38,38,38,0.2)` : 'none',
                 }}
               />
             );

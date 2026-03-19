@@ -61,11 +61,11 @@ export default function Profile() {
       <div className="mx-auto max-w-2xl space-y-5">
 
         {/* Header card */}
-        <div className="rounded-xl px-8 py-8" style={{ backgroundColor: 'rgba(122,95,76,1)', border: '2px solid rgba(84,61,46,1)' }}>
+        <div className="rounded-xl px-8 py-8" style={{ backgroundColor: C.darkBrown, border: `2px solid ${C.midBrown}` }}>
           <div className="flex items-center gap-5">
             <div
               className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl text-3xl font-bold"
-              style={{ backgroundColor: 'rgba(153,125,105,1)', color: C.cream }}
+              style={{ backgroundColor: C.midBrown, color: C.cream }}
             >
               {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?'}
             </div>
@@ -82,7 +82,7 @@ export default function Profile() {
               <span>Progress</span>
               <span>{completedStages.length} / 6 stages</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(157,131,112,1)' }}>
+            <div className="h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(70,70,78,1)' }}>
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${(completedStages.length / 6) * 100}%`, backgroundColor: C.lightTan }}
