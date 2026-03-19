@@ -10,15 +10,19 @@ router.get('/by-university', requireAuth, async (req, res) => {
     const userId = (req as AuthRequest).userId;
 
     const userResult = await db.query(
-      'SELECT university_id FROM "User" WHERE id = $1',
+      'SELECT university_id, interests FROM "User" WHERE id = $1',
       [userId]
     );
 
     const universityId = userResult.rows[0]?.university_id ?? null;
+    const fieldIds: string[] = userResult.rows[0]?.interests ?? [];
 
     const result = await db.query(
-      `SELECT * FROM topics WHERE "universityId" = $1 ORDER BY id`,
-      [universityId]
+      `SELECT * FROM topics
+       WHERE "universityId" = $1
+         AND (cardinality($2::text[]) = 0 OR "fieldIds" && $2::text[])
+       ORDER BY id`,
+      [universityId, fieldIds]
     );
 
     const parseArr = (v: unknown): string[] => {

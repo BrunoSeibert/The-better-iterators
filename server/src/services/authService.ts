@@ -96,7 +96,7 @@ export async function completeOnboarding(
   const result = await db.query(
     `UPDATE "User"
      SET is_onboarded = TRUE, current_level = $1, completed_stages = $2::int[],
-         university_id = $3, study_program_id = $4, degree_type = $5, field_ids = $6::text[]
+         university_id = $3, study_program_id = $4, degree_type = $5, interests = $6::text[]
      WHERE id = $7
      RETURNING id, name, email, is_onboarded, current_level, completed_stages`,
     [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
