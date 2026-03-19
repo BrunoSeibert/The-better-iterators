@@ -13,6 +13,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
 import Level1 from '@/pages/Level1';
 import LiteratureReview from '@/pages/LiteratureReview';
+import DailyCheckin from '@/components/DailyCheckin';
 import { DocumentReview } from '../document-review';
 import studyonLogo from '@/assets/Studyon_Logo.png';
 import badgerImage from '@/assets/Badger_2.png';
@@ -96,6 +97,16 @@ export default function Layout() {
   });
 
   const [achievementQueue, setAchievementQueue] = useState<typeof BADGES[number][]>([]);
+
+  const todayCheckinDone = (() => {
+    try {
+      const raw = localStorage.getItem('todayCheckin');
+      if (!raw) return false;
+      return new Date(JSON.parse(raw).date).toDateString() === new Date().toDateString();
+    } catch { return false; }
+  })();
+  const [checkinDone, setCheckinDone] = useState(todayCheckinDone);
+  const [checkinOpen, setCheckinOpen] = useState(!todayCheckinDone);
   const prevUnlockedRef = useRef<Set<string>>(new Set());
   const isInitializedRef = useRef(false); 
 
@@ -480,6 +491,12 @@ export default function Layout() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setCheckinOpen(true)}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            {checkinDone ? '✓ Checked in' : 'Daily check-in'}
+          </button>
         <div ref={badgerButtonSlotRef} className="relative h-12 w-12 shrink-0">
           {showTopbarBadgerButton && (
             <button
@@ -714,6 +731,32 @@ export default function Layout() {
           />
         ))}
       </div>
+
+      {/* Daily check-in modal */}
+      {checkinOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setCheckinOpen(false)}
+        >
+          <div
+            className="relative w-full mx-4 rounded-2xl p-8 shadow-xl overflow-y-auto"
+            style={{ maxWidth: 600, maxHeight: '90vh', backgroundColor: 'var(--background)', border: '1px solid var(--border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setCheckinOpen(false)}
+              className="absolute right-4 top-4 text-sm text-neutral-400 hover:text-neutral-600 transition"
+            >
+              ✕
+            </button>
+            <p className="mb-6 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
+              Daily check-in
+            </p>
+            <DailyCheckin onComplete={() => setCheckinDone(true)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
