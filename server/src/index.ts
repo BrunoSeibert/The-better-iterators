@@ -21,9 +21,11 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 import { chatRouter } from './routes/chat';
 import authRoutes from './routes/authRoutes';
 import dataRoutes from './routes/data';
+import topicsRoutes from './routes/topics';
 app.use('/api/chat', chatRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
+app.use('/api/topics', topicsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
