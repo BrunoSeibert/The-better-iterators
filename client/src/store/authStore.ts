@@ -4,6 +4,8 @@ interface User {
   id: string;
   name: string;
   email: string;
+  isOnboarded: boolean;
+  currentLevel: number;
 }
 
 interface AuthState {
