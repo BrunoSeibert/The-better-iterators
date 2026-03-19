@@ -1,11 +1,46 @@
 import { api } from './api';
 
+type AuthUser = {
+  id: string;
+  name: string;
+  email: string;
+  current_level: number;
+  first_login_date?: string;
+};
+
 export async function register(name: string, email: string, password: string) {
   const res = await api.post('/auth/register', { name, email, password });
-  return res.data;
+  return res.data as { user: AuthUser; token: string };
 }
 
 export async function login(email: string, password: string) {
   const res = await api.post('/auth/login', { email, password });
-  return res.data;
+  return res.data as { user: AuthUser; token: string };
+}
+
+export async function me() {
+  const res = await api.get('/auth/me');
+  return res.data as { user: AuthUser };
+}
+
+export async function resetLevel() {
+  const res = await api.post('/auth/level/reset');
+  return res.data as { user: AuthUser };
+}
+
+export async function progressLevel() {
+  const res = await api.post('/auth/level/progress');
+  return res.data as { user: AuthUser };
+}
+
+export async function getStreakSummary() {
+  const res = await api.get('/auth/streak');
+  return res.data as {
+    firstLoginDate: string;
+    currentStreak: number;
+    activeDates: string[];
+    streakDates: string[];
+    month: number;
+    year: number;
+  };
 }
