@@ -15,6 +15,15 @@ export default function Profile() {
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
+    authService.me()
+      .then(({ user: refreshedUser }) => {
+        useAuthStore.getState().setUser(refreshedUser);
+      })
+      .catch(() => {});
+  }, []);
+
+
+  useEffect(() => {
     let isMounted = true;
     authService.getStreakSummary()
       .then((data) => { if (isMounted) setStreak(data.currentStreak); })
