@@ -94,7 +94,7 @@ export default function LiteratureReview() {
 
       {/* Header */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Step 3 · Literature Review</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Step 1 · Ideation</p>
         <h2 className="mt-1 text-xl font-semibold text-neutral-900">Start your search</h2>
         <p className="mt-1 text-sm text-neutral-500">Based on your research interests, here's where to begin.</p>
       </div>
@@ -245,7 +245,7 @@ export default function LiteratureReview() {
         <div className="border-t border-neutral-200" />
         <section className="flex flex-col gap-3">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Step 3 · Find a Topic</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Find a Topic</h3>
             <p className="mt-1 text-sm text-neutral-500">Not sure what to write about? Let us match you with a thesis topic based on what you've read.</p>
           </div>
           {!suggestions && (
