@@ -4,16 +4,6 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-const FIXED_TODOS = [
-  { text: 'Find at least 5 relevant papers for your literature review', level: 1 },
-  { text: 'Analyze and annotate your key papers', level: 1 },
-  { text: 'Define your core research question', level: 3 },
-  { text: 'Complete all research proposal sections', level: 3 },
-  { text: 'Get supervisor feedback on your proposal', level: 3 },
-  { text: 'Outline your thesis chapter structure', level: 5 },
-  { text: 'Write your thesis introduction', level: 5 },
-];
-
 const LEVEL_WEIGHTS = [0.15, 0.25, 0.40, 0.55, 0.80, 1.0];
 
 function computeLevelDeadlines(mainDeadline: Date): Record<number, string> {
@@ -40,22 +30,6 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       [userId]
     );
     const user = userResult.rows[0];
-
-    // Ensure unique constraint exists to prevent duplicate seeding on concurrent requests
-    await db.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS todos_user_text_unique ON todos(user_id, text)
-    `).catch(() => {});
-
-    // Seed fixed todos on first visit (idempotent via ON CONFLICT DO NOTHING)
-    const todoCount = await db.query('SELECT COUNT(*) FROM todos WHERE user_id = $1', [userId]);
-    if (parseInt(todoCount.rows[0].count) === 0) {
-      await Promise.all(FIXED_TODOS.map((t) =>
-        db.query(
-          'INSERT INTO todos (id, user_id, text, done, level_link) VALUES (gen_random_uuid()::TEXT, $1, $2, false, $3) ON CONFLICT (user_id, text) DO NOTHING',
-          [userId, t.text, t.level]
-        )
-      ));
-    }
 
     const [todosResult, activityResult] = await Promise.all([
       db.query('SELECT * FROM todos WHERE user_id = $1 ORDER BY created_at ASC', [userId]),

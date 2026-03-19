@@ -125,6 +125,22 @@ export async function completeOnboarding(
       userId,
     ]
   );
+  const FIXED_TODOS = [
+    { text: 'Find at least 5 relevant papers for your literature review', level: 1 },
+    { text: 'Analyze and annotate your key papers', level: 1 },
+    { text: 'Define your core research question', level: 3 },
+    { text: 'Complete all research proposal sections', level: 3 },
+    { text: 'Get supervisor feedback on your proposal', level: 3 },
+    { text: 'Outline your thesis chapter structure', level: 5 },
+    { text: 'Write your thesis introduction', level: 5 },
+  ];
+  for (const t of FIXED_TODOS) {
+    await db.query(
+      'INSERT INTO todos (id, user_id, text, done, level_link) VALUES (gen_random_uuid()::TEXT, $1, $2, false, $3)',
+      [userId, t.text, t.level]
+    );
+  }
+
   return { token: signToken(result.rows[0]) };
 }
 

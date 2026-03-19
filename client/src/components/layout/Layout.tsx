@@ -723,7 +723,7 @@ const closeAssistant = () => {
         className="min-h-screen pt-[max(10vh,72px)] transition-[padding-right] duration-200"
         style={{ paddingRight: assistantOpen ? assistantPanelWidth : '0px' }}
       >
-        <section className="flex min-h-[calc(100vh-max(10vh,72px))] min-w-0 flex-col">
+        <section className="flex h-[calc(100vh-max(10vh,72px))] min-w-0 flex-col">
           <div className="flex h-[10vh] min-h-[88px] items-center border-b border-neutral-300 bg-neutral-100 px-4 sm:px-6 lg:px-8">
             <div
               ref={roadmapRef}
@@ -800,10 +800,12 @@ const closeAssistant = () => {
             </div>
           )}
 
-          <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
+          <div className="flex flex-1 min-h-0 overflow-hidden bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div
-              className={`flex min-h-full flex-1 overflow-y-auto rounded-md p-3 ${
-                levelSixCorrecting ? 'bg-transparent' : 'bg-neutral-200/70'
+              className={`flex flex-1 min-h-0 rounded-md ${
+                levelSixCorrecting || activeLevel === 2
+                  ? 'bg-transparent p-0 overflow-hidden'
+                  : 'bg-neutral-200/70 p-3 overflow-y-auto'
               }`}
             >
               {activeLevel === 1 && <LiteratureReview />}

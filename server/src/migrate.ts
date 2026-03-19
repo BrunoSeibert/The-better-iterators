@@ -28,5 +28,21 @@ export async function runMigrations() {
     );
 
     ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS step_context INTEGER;
+
+    CREATE TABLE IF NOT EXISTS professor_matches (
+      user_id TEXT NOT NULL,
+      professor_id TEXT NOT NULL,
+      match NUMERIC(5,4) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (user_id, professor_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS expert_matches (
+      user_id TEXT NOT NULL,
+      expert_id TEXT NOT NULL,
+      match NUMERIC(5,4) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (user_id, expert_id)
+    );
   `);
 }

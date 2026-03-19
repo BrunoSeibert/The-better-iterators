@@ -206,7 +206,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(212,212,216,1)' }}>Dashboard</p>
           <button
-            onClick={() => navigate('/app')}
+            onClick={() => { sessionStorage.removeItem('activeLevel'); navigate('/app'); }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
             style={{ color: 'rgba(229,229,229,1)', border: '2px solid rgba(82,82,91,1)' }}
           >
