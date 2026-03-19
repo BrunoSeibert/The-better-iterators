@@ -55,6 +55,8 @@ export default function Level1() {
   const [loading, setLoading] = useState(true);
   const [browsingOther, setBrowsingOther] = useState(false);
   const [loadingOther, setLoadingOther] = useState(false);
+  const [browsingAll, setBrowsingAll] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,6 +92,18 @@ export default function Level1() {
         setLoadingOther(false);
       })
       .catch(() => setLoadingOther(false));
+  };
+
+  const browseAllUniversities = () => {
+    setLoadingAll(true);
+    authService
+      .getTopicsAllUniversities()
+      .then(({ topics }) => {
+        setTopics(topics);
+        setBrowsingAll(true);
+        setLoadingAll(false);
+      })
+      .catch(() => setLoadingAll(false));
   };
 
   if (loading) {
@@ -138,12 +152,24 @@ export default function Level1() {
 
   return (
     <div className="flex flex-col gap-4">
-      {browsingOther && (
-        <p className="text-sm text-neutral-400">
-          Showing topics matching your interests from other universities
-        </p>
-      )}
+      {browsingAll ? (
+        <p className="text-sm text-neutral-400">Showing topics matching your interests from all universities</p>
+      ) : browsingOther ? (
+        <p className="text-sm text-neutral-400">Showing topics matching your interests from other universities</p>
+      ) : null}
       <TopicGrid topics={topics} />
+      {!browsingAll && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={browseAllUniversities}
+            disabled={loadingAll}
+            className="rounded-full border border-neutral-300 px-6 py-2.5 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-60"
+          >
+            {loadingAll ? 'Loading…' : 'Browse other universities'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

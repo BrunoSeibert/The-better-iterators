@@ -20,6 +20,7 @@ router.get('/by-university', requireAuth, async (req, res) => {
     const ignoreInterests = req.query.all === 'true';
     const global = req.query.global === 'true';
     const other = req.query.other === 'true';
+    const allUniversities = req.query.alluniversities === 'true';
 
     const parseArr = (v: unknown): string[] => {
       if (Array.isArray(v)) return v;
@@ -36,6 +37,14 @@ router.get('/by-university', requireAuth, async (req, res) => {
 
     if (global) {
       const result = await db.query(`SELECT * FROM topics ORDER BY id`);
+      return res.json({ topics: mapRows(result.rows) });
+    }
+
+    if (allUniversities) {
+      const result = await db.query(
+        `SELECT * FROM topics WHERE (cardinality($1::text[]) = 0 OR "fieldIds"::text[] && $1::text[]) ORDER BY id`,
+        [fieldIds]
+      );
       return res.json({ topics: mapRows(result.rows) });
     }
 

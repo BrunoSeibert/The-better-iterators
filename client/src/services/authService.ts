@@ -61,6 +61,22 @@ export async function progressLevel() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+export async function getTopicsAllUniversities() {
+  const res = await api.get('/topics/by-university?alluniversities=true');
+  return res.data as {
+    topics: {
+      id: string;
+      title: string;
+      description: string;
+      employment: string;
+      employmentType: string | null;
+      workplaceType: string | null;
+      degrees: string[];
+      companyId: string;
+    }[];
+  };
+}
+
 export async function getTopicsFromOtherUniversities() {
   const res = await api.get('/topics/by-university?other=true');
   return res.data as {
