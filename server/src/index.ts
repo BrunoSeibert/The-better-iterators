@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'https://skibidi-solutions.vercel.app'] }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '25mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
