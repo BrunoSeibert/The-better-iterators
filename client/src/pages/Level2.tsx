@@ -216,7 +216,7 @@ export default function Level2() {
     return (
       <div className="h-full w-full space-y-6 rounded-lg p-6" style={{ backgroundColor: C.warmWhite }}>
         <div>
-          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor</h1>
+          <h1 className="text-3xl font-semibold text-neutral-800">Find your Professor/Expert</h1>
           <p className="mt-1 text-sm" style={{ color: C.mutedText }}>
             {error ? 'Failed to load matches' : 'Computing AI matches...'}
           </p>
@@ -259,29 +259,30 @@ export default function Level2() {
     <div className="flex h-full w-full flex-col gap-4 rounded-lg p-6" style={{ backgroundColor: C.warmWhite }}>
       <div className="flex shrink-0 items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold" style={{ color: C.darkBrown }}>Find your Professor</h1>
+          <h1 className="text-3xl font-semibold text-neutral-800">Find your Professor/Expert</h1>
           <p className="mt-1 text-sm" style={{ color: C.mutedText }}>
             {universities.length} universities · {companies.length} companies matched to your profile
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 rounded-xl p-1" style={{ backgroundColor: C.lightTan }}>
           {([
-            { key: 'all', label: `All (${universities.length + companies.length})` },
-            { key: 'companies', label: 'Companies' },
-            { key: 'universities', label: 'Universities' },
-          ] as const).map(({ key, label }) => (
+            { key: 'all', label: 'All' } as const,
+            { key: 'universities', label: 'Universities', color: C.uniPin } as const,
+            { key: 'companies', label: 'Companies', color: C.midBrown } as const,
+          ]).map(({ key, label, color }) => (
             <button
               key={key}
-              onClick={() => {
-                setFilter(key);
-                closeSidebar();
+              onClick={() => { setFilter(key); closeSidebar(); }}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+              style={{
+                backgroundColor: filter === key ? C.cream : 'transparent',
+                color: filter === key ? C.darkBrown : C.mutedText,
+                boxShadow: filter === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                border: 'none',
+                cursor: 'pointer',
               }}
-              className={`rounded-[0.32rem] border-2 px-[clamp(0.85rem,2.8vw,1.25rem)] py-[clamp(0.42rem,1.5vw,0.5rem)] text-[clamp(0.95rem,2.5vw,1rem)] font-semibold transition ${
-                filter === key
-                  ? 'border-black bg-black text-white hover:bg-[rgba(28,28,28,1)]'
-                  : 'border-[rgba(178,178,178,0.98)] bg-[rgba(236,236,236,0.98)] text-[rgba(68,68,68,1)] hover:bg-[rgba(225,225,225,0.98)]'
-              }`}
             >
+              {color && <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
               {label}
             </button>
           ))}
