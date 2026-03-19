@@ -23,8 +23,7 @@ function getUserFromToken(token: string | null): User | null {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) return null;
     if (!payload.user) return null;
-    const completedStages = JSON.parse(localStorage.getItem('completedStages') || '[]');
-    return { ...payload.user, completedStages };
+    return payload.user;
   } catch {
     return null;
   }
@@ -37,13 +36,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: storedToken,
   setAuth: (user, token) => {
     localStorage.setItem('token', token);
-    localStorage.setItem('completedStages', JSON.stringify(user.completedStages ?? []));
     set({ user, token });
   },
-  setUser: (user) => set((state) => ({ ...state, user })),
+  setUser: (user) => set((state) => ({ ...state, user: { ...state.user!, ...user } as User })),
   logout: () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('completedStages');
     set({ user: null, token: null });
   },
 }));

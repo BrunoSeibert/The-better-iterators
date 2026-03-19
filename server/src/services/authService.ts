@@ -19,9 +19,9 @@ export async function touchDailyLogin(userId: string) {
   );
 }
 
-function signToken(user: { id: string; name: string; email: string; is_onboarded: boolean; current_level: number }) {
+function signToken(user: { id: string; name: string; email: string; is_onboarded: boolean; current_level: number; completed_stages?: number[] }) {
   return jwt.sign(
-    { userId: user.id, user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level } },
+    { userId: user.id, user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] } },
     process.env.JWT_SECRET!,
     { expiresIn: '7d' }
   );
@@ -35,17 +35,17 @@ export async function register(name: string, email: string, password: string) {
   const result = await db.query(
     `INSERT INTO "User" (id, name, email, password, current_level, first_login_date)
      VALUES (gen_random_uuid()::TEXT, $1, $2, $3, 1, $4::date)
-     RETURNING id, name, email, is_onboarded, current_level, first_login_date`,
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages, first_login_date`,
     [name, email, hashed, getLocalDateKey()]
   );
   const user = result.rows[0];
   await touchDailyLogin(user.id);
   const token = signToken(user);
-  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level }, token };
+  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] }, token };
 }
 
 export async function login(email: string, password: string) {
-  const result = await db.query('SELECT * FROM "User" WHERE email = $1', [email]);
+  const result = await db.query('SELECT id, name, email, password, is_onboarded, current_level, completed_stages FROM "User" WHERE email = $1', [email]);
   const user = result.rows[0];
   if (!user) throw new Error('Invalid credentials');
 
@@ -54,7 +54,7 @@ export async function login(email: string, password: string) {
 
   await touchDailyLogin(user.id);
   const token = signToken(user);
-  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level }, token };
+  return { user: { id: user.id, name: user.name, email: user.email, isOnboarded: user.is_onboarded, currentLevel: user.current_level, completedStages: user.completed_stages ?? [] }, token };
 }
 
 export async function completeOnboarding(
@@ -66,13 +66,15 @@ export async function completeOnboarding(
   degreeType: string,
   fieldIds: string[]
 ) {
-  await db.query(
+  const result = await db.query(
     `UPDATE "User"
      SET is_onboarded = TRUE, current_level = $1, completed_stages = $2,
          university_id = $3, study_program_id = $4, degree_type = $5, field_ids = $6
-     WHERE id = $7`,
+     WHERE id = $7
+     RETURNING id, name, email, is_onboarded, current_level, completed_stages`,
     [currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds, userId]
   );
+  return { token: signToken(result.rows[0]) };
 }
 
 export async function getUserById(userId: string) {

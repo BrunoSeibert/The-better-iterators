@@ -162,18 +162,18 @@ export default function Layout() {
   };
 
   useEffect(() => {
-    if (!user?.current_level) {
+    if (!user?.currentLevel) {
       return;
     }
 
-    setUnlockedLevel(user.current_level);
+    setUnlockedLevel(user.currentLevel);
     setActiveLevel((currentActiveLevel) =>
-      currentActiveLevel > user.current_level ? user.current_level : currentActiveLevel
+      currentActiveLevel > user.currentLevel! ? user.currentLevel! : currentActiveLevel
     );
-  }, [user?.current_level]);
+  }, [user?.currentLevel]);
 
   useEffect(() => {
-    if ((user && typeof user.current_level === 'number') || !localStorage.getItem('token')) {
+    if ((user && typeof user.currentLevel === 'number') || !localStorage.getItem('token')) {
       return;
     }
 

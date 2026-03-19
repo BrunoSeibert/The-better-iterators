@@ -32,7 +32,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const user = useAuthStore((s) => s.user);
-  const token = useAuthStore((s) => s.token);
+
 
   const [step, setStep] = useState<Step>('info');
   const [loading, setLoading] = useState(false);
@@ -56,7 +56,7 @@ export default function OnboardingPage() {
   const [hasAdvisor, setHasAdvisor] = useState<boolean | null>(null);
 
   const stepIndex = STEP_ORDER.indexOf(step);
-  const progress = (stepIndex / STEP_ORDER.length) * 100;
+  const progress = ((stepIndex + 1) / STEP_ORDER.length) * 100;
 
   useEffect(() => {
     api.get('/data/universities').then((r) => setUniversities(r.data));
@@ -82,8 +82,8 @@ export default function OnboardingPage() {
     const currentLevel = completedStages.length > 0 ? Math.max(...completedStages) : 0;
     setLoading(true);
     try {
-      await authService.completeOnboarding({ currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds });
-      setAuth({ ...user!, isOnboarded: true, currentLevel, completedStages }, token!);
+      const result = await authService.completeOnboarding({ currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds });
+      setAuth({ ...user!, isOnboarded: true, currentLevel, completedStages }, result.token);
       navigate('/app');
     } catch {
       setError('Something went wrong. Please try again.');
@@ -166,17 +166,21 @@ export default function OnboardingPage() {
 
               {/* Study program */}
               {studyPrograms.length > 0 && (
-                <select
-                  value={studyProgramId}
-                  onChange={(e) => setStudyProgramId(e.target.value)}
-                  className="w-full border rounded-2xl px-5 py-4 ds-body focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  style={{ borderColor: 'var(--border)', color: studyProgramId ? 'var(--foreground)' : 'var(--muted-foreground)' }}
-                >
-                  <option value="">Select your study program*</option>
+                <div className="w-full border rounded-2xl overflow-hidden max-h-48 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
                   {studyPrograms.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <button
+                      key={p.id}
+                      onClick={() => setStudyProgramId(p.id)}
+                      className="w-full text-left px-5 py-3 ds-small transition hover:bg-neutral-50 first:rounded-t-2xl last:rounded-b-2xl"
+                      style={{
+                        backgroundColor: studyProgramId === p.id ? 'var(--primary)' : 'transparent',
+                        color: studyProgramId === p.id ? 'var(--primary-foreground)' : 'var(--foreground)',
+                      }}
+                    >
+                      {p.name}
+                    </button>
                   ))}
-                </select>
+                </div>
               )}
               {universityId && degreeType && studyPrograms.length === 0 && (
                 <p className="ds-small text-center" style={{ color: 'var(--muted-foreground)' }}>
