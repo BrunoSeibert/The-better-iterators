@@ -302,11 +302,12 @@ function AddPaperModal({
 
 // ── Zone 2: Workspace Canvas ──────────────────────────────────────────────────
 
-function WorkspaceCanvas({ tabs, activeTabId, onSelectTab, onCloseTab }: {
+function WorkspaceCanvas({ tabs, activeTabId, onSelectTab, onCloseTab, onAddToLibrary }: {
   tabs: Tab[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
+  onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void>;
 }) {
   const active = tabs.find((t) => t.id === activeTabId);
 
@@ -348,7 +349,7 @@ function WorkspaceCanvas({ tabs, activeTabId, onSelectTab, onCloseTab }: {
             <p className="max-w-xs text-xs text-neutral-400">Pick a tool from the right panel. Results appear as tabs you can switch between without re-running.</p>
           </div>
         ) : (
-          <TabContent tab={active} />
+          <TabContent tab={active} onAddToLibrary={onAddToLibrary} />
         )}
       </div>
     </div>
@@ -378,8 +379,8 @@ function PdfTabContent({ paper }: { paper: ResearchPaper }) {
   return <iframe src={blobUrl} className="-m-4 block rounded-none" style={{ width: 'calc(100% + 2rem)', height: 'calc(100% + 2rem)' }} title={paper.title} />;
 }
 
-function TabContent({ tab }: { tab: Tab }) {
-  if (tab.type === 'find-papers') return <FindPapersResult papers={tab.data as FoundPaper[]} />;
+function TabContent({ tab, onAddToLibrary }: { tab: Tab; onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void> }) {
+  if (tab.type === 'find-papers') return <FindPapersResult papers={tab.data as FoundPaper[]} onAddToLibrary={onAddToLibrary} />;
   if (tab.type === 'check-source') return <CheckSourceResult result={tab.data as SourceCheckResult} />;
   if (tab.type === 'format-citation') return <CitationResult result={tab.data as { citations: string[]; style: string }} />;
   if (tab.type === 'concept-map') return <ConceptMapResultView result={tab.data as ConceptMapResult} />;
@@ -389,7 +390,7 @@ function TabContent({ tab }: { tab: Tab }) {
   return null;
 }
 
-function FindPapersResult({ papers }: { papers: FoundPaper[] }) {
+function FindPapersResult({ papers, onAddToLibrary }: { papers: FoundPaper[]; onAddToLibrary: (paper: { title: string; authors?: string; year?: number }) => Promise<void> }) {
   const [added, setAdded] = useState<Set<number>>(new Set());
   return (
     <div className="flex flex-col gap-3">
@@ -412,7 +413,7 @@ function FindPapersResult({ papers }: { papers: FoundPaper[] }) {
           </div>
           <p className="mt-2 text-sm text-neutral-600">{p.why}</p>
           <button
-            onClick={() => setAdded((s) => new Set(s).add(i))}
+            onClick={async () => { await onAddToLibrary({ title: p.title, authors: p.authors, year: p.year }); setAdded((s) => new Set(s).add(i)); }}
             disabled={added.has(i)}
             className="mt-3 rounded-lg border border-neutral-200 px-3 py-1 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-40"
           >
@@ -1021,6 +1022,7 @@ export default function ResearchWorkspace() {
           activeTabId={activeTabId}
           onSelectTab={setActiveTabId}
           onCloseTab={closeTab}
+          onAddToLibrary={(paper) => handleAddPaper(paper)}
         />
       </div>
 
