@@ -7,7 +7,8 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import { peekStreakSummary } from '@/services/authService';
 import DailyCheckin from '@/components/DailyCheckin';
-import studyonLogo from '@/assets/Studyon_Logo.png';
+import studyonLogo from '@/assets/Study_Logo.png';
+import badgerImage from '@/assets/Badger_2.png';
 
 const LEVEL_NAMES: Record<number, string> = {
   1: 'Literature Review',
@@ -128,6 +129,7 @@ export default function Dashboard() {
     1: deadlines.level1, 2: deadlines.level2, 3: deadlines.level3,
     4: deadlines.level4, 5: deadlines.level5, 6: deadlines.level6,
   };
+  const displayName = user?.name?.split(' ')[0] ?? 'there';
 
   // Find next overdue or upcoming level deadline
   const nextLevelDeadline = [1, 2, 3, 4, 5, 6]
@@ -138,19 +140,24 @@ export default function Dashboard() {
     <div className="min-h-screen bg-neutral-100 pb-16">
       {/* Header */}
       <header className="sticky top-0 z-30 flex h-[max(10vh,72px)] items-center justify-start bg-black px-4 sm:px-6 lg:px-8 gap-4">
-        <img src={studyonLogo} alt="Studyon logo" className="h-14 w-14 object-contain brightness-0 invert shrink-0" />
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Dashboard</p>
-          <h1 className="text-base font-semibold text-white leading-tight">
-            Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
-          </h1>
+        <img src={studyonLogo} alt="Studyon logo" className="h-12 w-12 object-contain brightness-0 invert shrink-0" />
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold uppercase tracking-widest text-neutral-400">Dashboard</p>
+          <button
+            type="button"
+            onClick={() => navigate('/app')}
+            className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white"
+          >
+            <span aria-hidden="true">🔨</span>
+            Workspace
+          </button>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate('/streak')}
-            className="flex items-center gap-2 rounded-full bg-neutral-950/40 px-4 py-2 text-orange-400 transition hover:bg-neutral-950/60"
+            className="hidden flex items-center gap-2 rounded-full bg-neutral-950/40 px-4 py-2 text-orange-400 transition hover:bg-neutral-950/60"
           >
             <span className="text-2xl leading-none">🔥</span>
             <span className="text-base font-semibold text-orange-400">{streak} days</span>
@@ -158,14 +165,14 @@ export default function Dashboard() {
           <button
             onClick={() => !checkinDone && setCheckinOpen(true)}
             disabled={checkinDone}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 cursor-default' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
           >
             {checkinDone ? '✓ Checked in' : 'Daily check-in'}
           </button>
           <button
             type="button"
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+            onClick={() => navigate('/profile', { state: { returnTo: '/dashboard' } })}
+            className="flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
               <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12Zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8Z"/>
@@ -197,21 +204,31 @@ export default function Dashboard() {
       )}
 
       <div className="mx-auto max-w-4xl px-4 pt-6 flex flex-col gap-6">
+        <div className="flex flex-col items-center justify-center gap-4 py-2 text-center">
+          <img
+            src={badgerImage}
+            alt="Badger mascot"
+            className="h-24 w-24 rounded-[18px] object-cover"
+          />
+          <h2 className="text-4xl font-bold tracking-tight text-black">
+            Welcome back, {displayName} {'\u{1F389}'}
+          </h2>
+        </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-white border border-neutral-200 p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold text-orange-500">🔥 {streak}</p>
+        <div className="mx-auto grid w-[60%] min-w-[32rem] grid-cols-3 gap-3">
+          <div className="rounded-md bg-white border border-neutral-300 px-3 py-2.5 text-center shadow-sm">
+            <p className="text-xl font-bold text-orange-500">🔥 {streak}</p>
             <p className="text-xs text-neutral-500 mt-1">day streak</p>
           </div>
-          <div className="rounded-2xl bg-white border border-neutral-200 p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold text-neutral-900">
+          <div className="rounded-md bg-white border border-neutral-300 px-3 py-2.5 text-center shadow-sm">
+            <p className="text-xl font-bold text-neutral-900">
               {daysToDeadline !== null ? (daysToDeadline < 0 ? `${Math.abs(daysToDeadline)}d late` : `${daysToDeadline}d`) : '—'}
             </p>
             <p className="text-xs text-neutral-500 mt-1">until submission</p>
           </div>
-          <div className="rounded-2xl bg-white border border-neutral-200 p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold text-neutral-900">{completedStages.length}<span className="text-base font-normal text-neutral-400">/6</span></p>
+          <div className="rounded-md bg-white border border-neutral-300 px-3 py-2.5 text-center shadow-sm">
+            <p className="text-xl font-bold text-neutral-900">{completedStages.length}<span className="text-sm font-normal text-neutral-400">/6</span></p>
             <p className="text-xs text-neutral-500 mt-1">levels done</p>
           </div>
         </div>
@@ -232,9 +249,13 @@ export default function Dashboard() {
                 <div
                   key={level}
                   onClick={() => goToLevel(level)}
-                  className={`rounded-2xl border p-4 shadow-sm transition flex flex-col gap-2 ${
-                    unlocked ? 'cursor-pointer hover:shadow-md hover:border-neutral-300' : 'opacity-50 cursor-not-allowed'
-                  } ${completed ? 'border-green-200 bg-green-50' : 'border-neutral-200 bg-white'}`}
+                  className={`flex flex-col gap-2 rounded-md border p-4 shadow-sm transition ${
+                    unlocked
+                      ? completed
+                        ? 'cursor-pointer hover:shadow-md hover:border-green-500'
+                        : 'cursor-pointer hover:shadow-md hover:border-neutral-500'
+                      : 'cursor-not-allowed opacity-50'
+                  } ${completed ? 'border-green-200 bg-green-50' : 'border-neutral-300 bg-white'}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${
@@ -265,7 +286,7 @@ export default function Dashboard() {
           {/* Deadline manager */}
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">Thesis Deadline</h2>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm flex flex-col gap-3">
+            <div className="rounded-md border border-neutral-300 bg-white p-4 shadow-sm flex flex-col gap-3">
               {!editingDeadline ? (
                 <>
                   <div>
@@ -280,7 +301,7 @@ export default function Dashboard() {
                   </div>
                   <button
                     onClick={() => { setDeadlineInput(deadlines.main ?? ''); setEditingDeadline(true); }}
-                    className="self-start text-xs text-neutral-400 hover:text-neutral-700 transition"
+                    className="self-start rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-700"
                   >
                     {deadlines.main ? 'Change deadline' : 'Set deadline'}
                   </button>
@@ -292,11 +313,11 @@ export default function Dashboard() {
                     value={deadlineInput}
                     onChange={(e) => setDeadlineInput(e.target.value)}
                     min={new Date().toISOString().slice(0, 10)}
-                    className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                    className="w-full rounded-md border border-neutral-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleDeadlineSave} className="rounded-xl px-4 py-2 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-700 transition">Save</button>
-                    <button onClick={() => setEditingDeadline(false)} className="rounded-xl px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700 transition">Cancel</button>
+                    <button onClick={handleDeadlineSave} className="rounded-md border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700">Save</button>
+                    <button onClick={() => setEditingDeadline(false)} className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-700">Cancel</button>
                   </div>
                 </>
               )}
@@ -326,7 +347,7 @@ export default function Dashboard() {
           {/* Recent activity */}
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">Recent Activity</h2>
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm flex flex-col gap-2">
+            <div className="rounded-md border border-neutral-300 bg-white p-4 shadow-sm flex flex-col gap-2">
               {data?.recentActivity.length === 0 ? (
                 <p className="text-sm text-neutral-400">No activity yet. Start working on your thesis!</p>
               ) : (
@@ -334,7 +355,7 @@ export default function Dashboard() {
                   <div
                     key={a.id}
                     onClick={() => a.level && goToLevel(a.level, a.step_context)}
-                    className={`flex items-start gap-2 rounded-xl px-2 py-1.5 -mx-2 transition ${a.level ? 'cursor-pointer hover:bg-neutral-50 group' : ''}`}
+                    className={`-mx-2 flex items-start gap-2 rounded-md px-2 py-1.5 transition ${a.level ? 'group cursor-pointer hover:bg-neutral-50' : ''}`}
                   >
                     <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-400 mt-2" />
                     <div className="flex-1 min-w-0">
@@ -359,7 +380,7 @@ export default function Dashboard() {
         {/* Todo list */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3">To-Do</h2>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm flex flex-col gap-2">
+          <div className="rounded-md border border-neutral-300 bg-white p-4 shadow-sm flex flex-col gap-2">
             {data?.todos.map((todo) => (
               <div key={todo.id} className="flex items-center gap-3 group">
                 <button onClick={() => handleToggle(todo)} className="shrink-0">
@@ -371,7 +392,7 @@ export default function Dashboard() {
                 {todo.level_link && (
                   <span
                     onClick={() => goToLevel(todo.level_link!)}
-                    className="shrink-0 cursor-pointer rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-200 transition"
+                    className="shrink-0 cursor-pointer rounded-md border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 transition hover:border-neutral-500 hover:bg-neutral-200"
                   >
                     Level {todo.level_link}
                   </span>
@@ -381,18 +402,18 @@ export default function Dashboard() {
             ))}
 
             {/* Add new todo */}
-            <div className="flex gap-2 mt-2 pt-2 border-t border-neutral-100">
+            <div className="mt-2 flex gap-2 border-t border-neutral-100 pt-2">
               <input
                 value={newTodo}
                 onChange={(e) => setNewTodo(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTodo()}
                 placeholder="Add a task…"
-                className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
+                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-300"
               />
               <select
                 value={newTodoLevel}
                 onChange={(e) => setNewTodoLevel(e.target.value ? Number(e.target.value) : '')}
-                className="rounded-xl border border-neutral-200 px-2 py-2 text-sm text-neutral-500 focus:outline-none"
+                className="rounded-md border border-neutral-300 px-2 py-2 text-sm text-neutral-500 focus:outline-none"
               >
                 <option value="">No level</option>
                 {[1, 2, 3, 4, 5, 6].map((l) => <option key={l} value={l}>Level {l}</option>)}
@@ -400,7 +421,7 @@ export default function Dashboard() {
               <button
                 onClick={handleAddTodo}
                 disabled={!newTodo.trim()}
-                className="rounded-xl px-4 py-2 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-700 disabled:opacity-40 transition"
+                className="rounded-md border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-40"
               >
                 Add
               </button>
@@ -412,3 +433,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+

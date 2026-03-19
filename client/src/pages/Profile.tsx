@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as authService from '@/services/authService';
 import { BADGES } from '@/utils/badges';
 
@@ -8,6 +8,8 @@ export default function Profile() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? '/app';
 
   const level = user?.currentLevel ?? 0;
   const completedStages = user?.completedStages ?? [];
@@ -48,7 +50,7 @@ export default function Profile() {
     <div className="min-h-screen bg-neutral-100 px-4 py-12 sm:px-8">
       <button
         type="button"
-        onClick={() => navigate('/app')}
+        onClick={() => navigate(returnTo)}
         className="mb-8 flex items-center gap-2 rounded-[0.32rem] border-2 border-[rgba(176,176,176,0.95)] bg-[rgba(246,246,246,0.98)] px-4 py-2 text-sm font-medium text-[rgba(108,108,108,0.96)] transition hover:border-[rgba(150,150,150,0.98)] hover:bg-[rgba(252,252,252,1)] hover:text-[rgba(82,82,82,0.98)]"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
@@ -147,7 +149,7 @@ export default function Profile() {
           type="button"
           onClick={() => {
             logout();
-            navigate('/login');
+            navigate('/login', { state: { returnTo } });
           }}
           className="w-full rounded-[0.32rem] border-2 border-[rgba(132,28,28,0.98)] bg-[rgba(186,43,43,0.98)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[rgba(171,35,35,0.98)]"
         >

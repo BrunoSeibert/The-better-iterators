@@ -110,9 +110,21 @@ export default function Level2() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center rounded-xl bg-[var(--panel-warm)] p-8">
-        <div className="chunky-panel px-8 py-6 text-lg font-semibold text-[var(--foreground)]">
-          Loading map...
+      <div className="h-screen w-full space-y-6 rounded-lg bg-[var(--panel-warm)] p-6 text-[var(--foreground)]">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-[var(--foreground)]">
+              Find your Professor
+            </h1>
+            <p className="mt-1 text-[var(--stroke-brown-soft)]">Loading matches near Winterthur</p>
+          </div>
+        </div>
+
+        <div className="relative flex h-[calc(100%-6rem)] min-h-0 items-center justify-center overflow-hidden rounded-none border-[3px] border-[var(--stroke-brown)] bg-[var(--panel-cream)] shadow-none">
+          <div className="flex flex-col items-center gap-4 px-8 py-6 text-[var(--foreground)]">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[rgba(178,178,178,0.9)] border-t-[var(--stroke-brown)]" />
+            <div className="text-lg font-semibold">Loading map...</div>
+          </div>
         </div>
       </div>
     );

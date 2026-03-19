@@ -588,10 +588,10 @@ export default function Layout() {
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          className="flex items-center gap-2 rounded-md px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Back to Dashboard"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"/>
           </svg>
           <span className="text-sm font-medium">Dashboard</span>
@@ -604,15 +604,18 @@ export default function Layout() {
         <button
           type="button"
           onClick={() => navigate('/streak')}
-          className="ml-4 flex items-center gap-3 rounded-full bg-neutral-950/40 px-5 py-2.5 text-orange-400 transition hover:bg-neutral-950/60"
+          className="ml-4 flex items-center gap-1.5 rounded-md px-5 py-2.5 text-orange-400 transition hover:bg-white/5"
           aria-label="Open streak page"
         >
           <span aria-hidden="true" className="text-3xl leading-none">{'\u{1F525}'}</span>
-          <span className="text-xl font-semibold text-orange-400">
-            {dailyStreak === null ? '...' : `${dailyStreak} days`}
+          <span
+            className="text-[1.45rem] leading-none text-orange-400"
+            style={{ fontFamily: '"Arial Black", "Avenir Next", sans-serif', fontWeight: 900 }}
+          >
+            {dailyStreak === null ? '...' : dailyStreak}
           </span>
         </button>
-        <div className="ml-8 flex items-center gap-3 lg:ml-12">
+        <div className="ml-8 hidden items-center gap-3 lg:ml-12">
           <button
             type="button"
             onClick={() => updateLevel('reset')}
@@ -635,7 +638,7 @@ export default function Layout() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={handleCheckinButtonClick}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+            className={`hidden rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition ${checkinDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
           >
             {checkinDone ? '✓ Checked in' : 'Daily check-in'}
           </button>
@@ -660,8 +663,8 @@ export default function Layout() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/profile')}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
+          onClick={() => navigate('/profile', { state: { returnTo: '/app' } })}
+          className="flex items-center gap-2 rounded-md px-5 py-3 text-neutral-400 transition hover:bg-neutral-800 hover:text-white"
           aria-label="Profile"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
