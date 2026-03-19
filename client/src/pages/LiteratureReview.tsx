@@ -1,27 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { literatureStart, literatureAnalyze, literatureSuggestTopics, type Phase1Data, type PaperAnalysis, type TopicSuggestion } from '@/services/authService';
 
+function load<T>(key: string): T | null {
+  try { const v = sessionStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
+}
+function save(key: string, value: unknown) {
+  try { sessionStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
 export default function LiteratureReview() {
-  const [phase1, setPhase1] = useState<Phase1Data | null>(null);
-  const [loadingPhase1, setLoadingPhase1] = useState(true);
+  const [phase1, setPhase1] = useState<Phase1Data | null>(() => load('lit_phase1'));
+  const [loadingPhase1, setLoadingPhase1] = useState(load('lit_phase1') === null);
   const [phase1Error, setPhase1Error] = useState<string | null>(null);
 
-  const [papers, setPapers] = useState<PaperAnalysis[]>([]);
-  const [feedback, setFeedback] = useState<Record<number, 'liked' | 'disliked'>>({});
+  const [papers, setPapers] = useState<PaperAnalysis[]>(() => load('lit_papers') ?? []);
+  const [feedback, setFeedback] = useState<Record<number, 'liked' | 'disliked'>>(() => load('lit_feedback') ?? {});
   const [input, setInput] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  const [suggestions, setSuggestions] = useState<TopicSuggestion[] | null>(null);
+  const [suggestions, setSuggestions] = useState<TopicSuggestion[] | null>(() => load('lit_suggestions'));
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
 
+  const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { save('lit_papers', papers); }, [papers]);
+  useEffect(() => { save('lit_feedback', feedback); }, [feedback]);
+  useEffect(() => { save('lit_suggestions', suggestions); }, [suggestions]);
+
   useEffect(() => {
+    if (phase1) return; // already restored from sessionStorage
     let cancelled = false;
     literatureStart()
-      .then((res) => { if (!cancelled) { setPhase1(res); setLoadingPhase1(false); } })
+      .then((res) => { if (!cancelled) { setPhase1(res); save('lit_phase1', res); setLoadingPhase1(false); } })
       .catch((err) => { if (!cancelled) { setPhase1Error(err.message ?? 'Failed to load'); setLoadingPhase1(false); } });
     return () => { cancelled = true; };
   }, []);
@@ -227,57 +241,76 @@ export default function LiteratureReview() {
       </section>
 
       {/* Phase 3: Topic suggestions */}
-      {papers.length >= 2 && (
-        <>
-          <div className="border-t border-neutral-200" />
-          <section className="flex flex-col gap-3">
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Step 3 · Find a Topic</h3>
-              <p className="mt-1 text-sm text-neutral-500">Not sure what to write about? Let us match you with a thesis topic based on what you've read.</p>
-            </div>
-            {!suggestions && (
-              <>
-                {suggestError && <p className="text-xs text-red-500">{suggestError}</p>}
+      <>
+        <div className="border-t border-neutral-200" />
+        <section className="flex flex-col gap-3">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Step 3 · Find a Topic</h3>
+            <p className="mt-1 text-sm text-neutral-500">Not sure what to write about? Let us match you with a thesis topic based on what you've read.</p>
+          </div>
+          {!suggestions && (
+            <>
+              {suggestError && <p className="text-xs text-red-500">{suggestError}</p>}
+              <div className="relative self-start group">
                 <button
                   onClick={handleSuggestTopics}
-                  disabled={loadingSuggestions}
-                  className="self-start rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-40"
+                  disabled={papers.length < 2 || loadingSuggestions}
+                  className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 >
                   {loadingSuggestions ? 'Finding topics…' : 'Find me a topic'}
                 </button>
-              </>
-            )}
+                {papers.length < 2 && (
+                  <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-xl bg-neutral-900 px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    {papers.length === 0
+                      ? 'Analyze at least 2 papers first to get topic suggestions.'
+                      : 'Almost there — analyze one more paper to unlock topic suggestions.'}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
             {suggestions && suggestions.length === 0 && (
               <p className="text-sm text-neutral-500">No matching topics found for your university. Try reviewing more papers first.</p>
             )}
             {suggestions && suggestions.length > 0 && (
               <div className="flex flex-col gap-3">
                 {suggestions.map((topic) => (
-                  <div key={topic.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+                  <div key={topic.id} onClick={() => navigate(`/topics/${topic.id}`)} className="cursor-pointer rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-neutral-300 hover:shadow-md">
                     <p className="font-semibold text-neutral-900">{topic.title}</p>
-                    {topic.field_names?.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1.5">
-                        {topic.field_names.map((f, i) => (
-                          <span key={i} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-500">{f}</span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {topic.field_names?.map((f, i) => (
+                        <span key={i} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-500">{f}</span>
+                      ))}
+                      {topic.universityName && (
+                        <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-600">{topic.universityName}</span>
+                      )}
+                    </div>
                     <p className="mt-2 text-sm text-neutral-600">{topic.description}</p>
                     <p className="mt-2 text-xs text-neutral-400 italic">{topic.reason}</p>
                   </div>
                 ))}
-                <button
-                  onClick={() => { setSuggestions(null); handleSuggestTopics(); }}
-                  className="self-start text-xs text-neutral-400 hover:text-neutral-600 transition"
-                >
-                  Refresh suggestions
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => { setSuggestions(null); handleSuggestTopics(); }}
+                    className="text-xs text-neutral-400 hover:text-neutral-600 transition"
+                  >
+                    Refresh suggestions
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/explore-other-topics', { state: { topicIds: suggestions.map((t) => t.id) } });
+                    }}
+                    className="rounded-2xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
+                    style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                  >
+                    Explore similar topics from other universities
+                  </button>
+                </div>
               </div>
             )}
           </section>
-        </>
-      )}
+      </>
 
       <div ref={bottomRef} />
     </div>

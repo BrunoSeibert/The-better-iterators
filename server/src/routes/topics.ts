@@ -36,22 +36,38 @@ router.get('/by-university', requireAuth, async (req, res) => {
     }));
 
     if (global) {
-      const result = await db.query(`SELECT * FROM topics ORDER BY id`);
+      const result = await db.query(`SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" ORDER BY t.id`);
       return res.json({ topics: mapRows(result.rows) });
     }
 
     if (allUniversities) {
       const result = await db.query(
-        `SELECT * FROM topics WHERE (cardinality($1::text[]) = 0 OR "fieldIds"::text[] && $1::text[]) ORDER BY id`,
+        `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t.employment = 'no' AND (cardinality($1::text[]) = 0 OR t."fieldIds"::text[] && $1::text[]) ORDER BY t.id`,
         [fieldIds]
       );
       return res.json({ topics: mapRows(result.rows) });
     }
 
     if (other) {
+      let filterIds = fieldIds;
+
+      const fromTopicIds = req.query.fromTopicIds
+        ? String(req.query.fromTopicIds).split(',').filter(Boolean)
+        : null;
+
+      if (fromTopicIds && fromTopicIds.length > 0) {
+        const srcResult = await db.query(
+          `SELECT array_agg(DISTINCT fi) as field_ids
+           FROM topics src, unnest(src."fieldIds"::text[]) fi
+           WHERE src.id = ANY($1::text[])`,
+          [fromTopicIds]
+        );
+        filterIds = srcResult.rows[0]?.field_ids ?? [];
+      }
+
       const result = await db.query(
-        `SELECT * FROM topics WHERE "universityId" IS DISTINCT FROM $1 AND (cardinality($2::text[]) = 0 OR "fieldIds"::text[] && $2::text[]) ORDER BY id`,
-        [universityId, fieldIds]
+        `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t.employment = 'no' AND t."universityId" IS DISTINCT FROM $1 AND (cardinality($2::text[]) = 0 OR t."fieldIds"::text[] && $2::text[]) ORDER BY t.id`,
+        [universityId, filterIds]
       );
       return res.json({ topics: mapRows(result.rows) });
     }
@@ -62,8 +78,8 @@ router.get('/by-university', requireAuth, async (req, res) => {
 
     const result = await db.query(
       ignoreInterests
-        ? `SELECT * FROM topics WHERE "universityId" = $1 ORDER BY id`
-        : `SELECT * FROM topics WHERE "universityId" = $1 AND (cardinality($2::text[]) = 0 OR "fieldIds"::text[] && $2::text[]) ORDER BY id`,
+        ? `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t."universityId" = $1 ORDER BY t.id`
+        : `SELECT t.*, u.name as "universityName" FROM topics t LEFT JOIN universities u ON u.id = t."universityId" WHERE t."universityId" = $1 AND (cardinality($2::text[]) = 0 OR t."fieldIds"::text[] && $2::text[]) ORDER BY t.id`,
       ignoreInterests ? [universityId] : [universityId, fieldIds]
     );
 

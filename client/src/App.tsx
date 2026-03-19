@@ -6,6 +6,7 @@ import OnboardingPage from '@/pages/OnboardingPage';
 import { useAuthStore } from '@/store/authStore';
 import Profile from './pages/Profile';
 import TopicDetailPage from '@/pages/TopicDetailPage';
+import ExploreOtherTopics from '@/pages/ExploreOtherTopics';
 
 function ProtectedRoute() {
   const { token, user } = useAuthStore((state) => state);
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/streak" element={<StreakPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/topics/:id" element={<TopicDetailPage />} />
+        <Route path="/explore-other-topics" element={<ExploreOtherTopics />} />
       </Route>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

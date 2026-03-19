@@ -12,7 +12,6 @@ import {
 } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AiAssistant from '../chat/AiAssistant';
-import Level1 from '@/pages/Level1';
 import LiteratureReview from '@/pages/LiteratureReview';
 import DailyCheckin from '@/components/DailyCheckin';
 import { DocumentReview } from '../document-review';
@@ -24,7 +23,7 @@ import AchievementToast from '../AchievementToast';
 import { BADGES } from '@/utils/badges';
 
 
-const levels = Array.from({ length: 7 }, (_, index) => index + 1);
+const levels = Array.from({ length: 6 }, (_, index) => index + 1);
 const topbarHeight = 'max(10vh, 72px)';
 const assistantPanelWidth = 'clamp(320px, 32vw, 380px)';
 
@@ -37,7 +36,7 @@ type RectState = {
 
 
 const UNLOCK_DEPS: Record<number, number[]> = {
-  1: [], 2: [], 3: [1], 4: [1, 2, 3], 5: [4], 6: [5], 7: [6],
+  1: [], 2: [], 3: [1, 2], 4: [3], 5: [4], 6: [5],
 };
 
 function isLevelUnlocked(level: number, completedStages: number[]) {
@@ -71,7 +70,11 @@ export default function Layout() {
   const completedStages = useMemo(() => user?.completedStages ?? [], [user?.completedStages]);
   const preferredActiveLevel = useMemo(() => getPreferredActiveLevel(user?.currentLevel, completedStages), [user?.currentLevel, completedStages]);
   const furthestUnlockedLevel = useMemo(() => getFurthestUnlockedLevel(completedStages), [completedStages]);
-  const [activeLevel, setActiveLevel] = useState(preferredActiveLevel);
+  const [activeLevel, setActiveLevel] = useState(() => {
+    const stored = sessionStorage.getItem('activeLevel');
+    if (stored) return parseInt(stored, 10);
+    return preferredActiveLevel;
+  });
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [levelLoading, setLevelLoading] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -89,6 +92,8 @@ export default function Layout() {
   const levelSixFileInputRef = useRef<HTMLInputElement | null>(null);
   const badgerButtonSlotRef = useRef<HTMLDivElement | null>(null);
   const assistantBadgerRef = useRef<HTMLImageElement | null>(null);
+  useEffect(() => { sessionStorage.setItem('activeLevel', String(activeLevel)); }, [activeLevel]);
+
   const badgerTransitionTimeoutRef = useRef<number | null>(null);
   const levelUpTimeoutRef = useRef<number | null>(null);
   const dragState = useRef({
@@ -213,7 +218,8 @@ export default function Layout() {
 
     let isMounted = true;
 
-    refreshLevelState()
+    const storedLevel = parseInt(sessionStorage.getItem('activeLevel') ?? '', 10) || undefined;
+    refreshLevelState(storedLevel)
       .catch(() => {
         if (!isMounted) {
           return;
@@ -553,9 +559,8 @@ export default function Layout() {
 
           <div className="flex flex-1 bg-white px-2 py-2 sm:px-3 sm:py-3">
             <div className="flex min-h-full flex-1 overflow-y-auto rounded-md bg-neutral-200/70 p-3">
-              {activeLevel === 1 && <Level1 />}
-              {activeLevel === 3 && <LiteratureReview />}
-              {activeLevel === 6 && (
+              {activeLevel === 1 && <LiteratureReview />}
+              {activeLevel === 5 && (
                 levelSixCorrecting ? (
                   levelSixFile ? (
                     <DocumentReview
