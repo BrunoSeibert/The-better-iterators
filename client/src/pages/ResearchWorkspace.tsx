@@ -107,7 +107,7 @@ function PaperLibrary({
       {/* Header */}
       <div className="border-b border-neutral-200 px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Paper Library</p>
-        <p className="mt-0.5 text-sm font-semibold text-neutral-800">
+        <p className="mt-0.5 text-base font-semibold text-neutral-800">
           {papers.length} {papers.length === 1 ? 'paper' : 'papers'}
         </p>
       </div>
