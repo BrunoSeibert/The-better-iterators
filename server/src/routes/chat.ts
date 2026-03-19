@@ -5,7 +5,6 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Cache loaded once at startup
 let dbCache: string | null = null;
 
 async function getDbContext(): Promise<string> {
@@ -71,6 +70,9 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
+    const userResult = await db.query('SELECT * FROM "User" WHERE id = $1', [userId]);
+    const currentUser = userResult.rows[0];
+
     let convId = conversationId;
     if (!convId) {
       const conv = await db.query(
@@ -101,11 +103,16 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       content: m.content,
     }));
 
-    const dbContext = await getDbContext(); // ← cached after first call
+    const dbContext = await getDbContext();
 
     const previousContext = previousMessages.length > 0
       ? `\n\n## Previous Chat History\n${previousMessages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
       : '';
+
+    const userContext = `
+## Current User
+${JSON.stringify(currentUser, null, 2)}
+`;
 
     const systemPrompt = `You are StudyOnd's AI thesis assistant. Help students find thesis topics, supervisors, companies and experts that match their interests and goals.
 
@@ -116,6 +123,7 @@ When writing mathematical expressions, you MUST use these exact formats:
 - Block math: wrap in double dollar signs: $$e^{i\\theta} = \\cos(\\theta) + i\\sin(\\theta)$$
 - NEVER use \\[ ... \\] or \\( ... \\) formats — they will not render.
 
+${userContext}
 ${dbContext}
 ${previousContext}`;
 
@@ -141,4 +149,5 @@ ${previousContext}`;
 });
 
 export { router as chatRouter };
+
 
