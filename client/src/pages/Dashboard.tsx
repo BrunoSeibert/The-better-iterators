@@ -41,13 +41,15 @@ function isLevelUnlocked(level: number, completedStages: number[]) {
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
-  const diff = new Date(dateStr).getTime() - new Date().setHours(0, 0, 0, 0);
+  const diff = new Date(dateStr.slice(0, 10) + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0);
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  // Slice to YYYY-MM-DD to avoid UTC→local timezone shift when the DB returns ISO datetime strings
+  const d = new Date(dateStr.slice(0, 10) + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function DeadlinePill({ days }: { days: number | null }) {
@@ -164,16 +166,20 @@ export default function Dashboard() {
 
   const handleDeadlineSave = async () => {
     if (!deadlineInput) return;
-    const result = await updateMainDeadline(deadlineInput);
-    setData((d) => d ? {
-      ...d,
-      deadlines: {
-        main: deadlineInput,
-        level1: result.levels[1], level2: result.levels[2], level3: result.levels[3],
-        level4: result.levels[4], level5: result.levels[5], level6: result.levels[6],
-      },
-    } : d);
-    setEditingDeadline(false);
+    try {
+      const result = await updateMainDeadline(deadlineInput);
+      setData((d) => d ? {
+        ...d,
+        deadlines: {
+          main: deadlineInput,
+          level1: result.levels[1] ?? null, level2: result.levels[2] ?? null, level3: result.levels[3] ?? null,
+          level4: result.levels[4] ?? null, level5: result.levels[5] ?? null, level6: result.levels[6] ?? null,
+        },
+      } : d);
+      setEditingDeadline(false);
+    } catch {
+      alert('Failed to save deadline. Please try again.');
+    }
   };
 
   const goToLevel = (level: number, stepContext?: number | null) => {
@@ -437,7 +443,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <p style={{ fontSize: 18, fontWeight: 700, color: C.darkBrown, marginTop: 2 }}>{formatDate(deadlines.main)}</p>
                     <button
-                      onClick={() => { setDeadlineInput(deadlines.main ?? ''); setEditingDeadline(true); }}
+                      onClick={() => { setDeadlineInput((deadlines.main ?? '').slice(0, 10)); setEditingDeadline(true); }}
                       style={{ fontSize: 11, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                     >
                       {deadlines.main ? 'Change' : 'Set'}
@@ -473,7 +479,7 @@ export default function Dashboard() {
                           }
                           {!isEditingThis && (
                             <button
-                              onClick={() => { setLevelDeadlineInput(levelDeadlineMap[l] ?? ''); setEditingLevelDeadline(l); }}
+                              onClick={() => { setLevelDeadlineInput((levelDeadlineMap[l] ?? '').slice(0, 10)); setEditingLevelDeadline(l); }}
                               className="opacity-0 group-hover/dl:opacity-100 transition"
                               style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.warmWhite, color: C.mutedText, cursor: 'pointer' }}
                             >
@@ -488,17 +494,21 @@ export default function Dashboard() {
                           <div className="flex gap-1.5">
                             <button
                               onClick={async () => {
-                                const { levels } = await updateLevelDeadline(l, levelDeadlineInput);
-                                setData((d) => d ? {
-                                  ...d,
-                                  deadlines: {
-                                    ...d.deadlines,
-                                    level1: levels[1] ?? null, level2: levels[2] ?? null,
-                                    level3: levels[3] ?? null, level4: levels[4] ?? null,
-                                    level5: levels[5] ?? null, level6: levels[6] ?? null,
-                                  },
-                                } : d);
-                                setEditingLevelDeadline(null);
+                                try {
+                                  const { levels } = await updateLevelDeadline(l, levelDeadlineInput);
+                                  setData((d) => d ? {
+                                    ...d,
+                                    deadlines: {
+                                      ...d.deadlines,
+                                      level1: levels[1] ?? null, level2: levels[2] ?? null,
+                                      level3: levels[3] ?? null, level4: levels[4] ?? null,
+                                      level5: levels[5] ?? null, level6: levels[6] ?? null,
+                                    },
+                                  } : d);
+                                  setEditingLevelDeadline(null);
+                                } catch {
+                                  alert('Failed to save deadline. Please try again.');
+                                }
                               }}
                               style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}
                             >

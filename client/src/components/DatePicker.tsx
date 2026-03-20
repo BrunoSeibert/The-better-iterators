@@ -23,7 +23,9 @@ function toYMD(d: Date) {
 
 function parseYMD(s: string): Date | null {
   if (!s) return null;
-  const d = new Date(s + 'T00:00:00');
+  // Accept both 'YYYY-MM-DD' and ISO datetime strings like '2026-03-21T00:00:00.000Z'
+  const ymd = s.slice(0, 10);
+  const d = new Date(ymd + 'T00:00:00');
   return isNaN(d.getTime()) ? null : d;
 }
 

@@ -6,15 +6,22 @@ const router = Router();
 
 const LEVEL_WEIGHTS = [0.15, 0.25, 0.40, 0.55, 0.80, 1.0];
 
+function toYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function computeLevelDeadlines(mainDeadline: Date): Record<number, string> {
   const today = new Date();
   const totalMs = mainDeadline.getTime() - today.getTime();
   const result: Record<number, string> = {};
   LEVEL_WEIGHTS.forEach((w, i) => {
     const d = new Date(today.getTime() + totalMs * w);
-    result[i + 1] = d.toISOString().slice(0, 10);
+    result[i + 1] = toYMD(d);
   });
-  result[6] = mainDeadline.toISOString().slice(0, 10);
+  result[6] = toYMD(mainDeadline);
   return result;
 }
 

@@ -86,15 +86,22 @@ export async function login(email: string, password: string) {
 
 const LEVEL_WEIGHTS = [0.15, 0.25, 0.40, 0.55, 0.80, 1.0];
 
+function toYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function computeLevelDeadlines(mainDeadline: string): Record<number, string> {
   const today = new Date();
-  const d = new Date(mainDeadline);
+  const d = new Date(mainDeadline.slice(0, 10) + 'T00:00:00');
   const totalMs = d.getTime() - today.getTime();
   const result: Record<number, string> = {};
   LEVEL_WEIGHTS.forEach((w, i) => {
-    result[i + 1] = new Date(today.getTime() + totalMs * w).toISOString().slice(0, 10);
+    result[i + 1] = toYMD(new Date(today.getTime() + totalMs * w));
   });
-  result[6] = d.toISOString().slice(0, 10);
+  result[6] = toYMD(d);
   return result;
 }
 
