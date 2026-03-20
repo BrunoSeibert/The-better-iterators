@@ -146,20 +146,41 @@ export default function Dashboard() {
 
   const handleAddTodo = async () => {
     if (!newTodo.trim() || !data) return;
-    const todo = await createTodo(newTodo.trim(), newTodoLevel || undefined);
-    setData((d) => d ? { ...d, todos: [...d.todos, todo] } : d);
+    const text = newTodo.trim();
+    const levelLink = newTodoLevel || undefined;
+    // Optimistic: add a placeholder immediately
+    const tempId = `temp-${Date.now()}`;
+    const placeholder: Todo = { id: tempId, text, done: false, level_link: levelLink ?? null, created_at: new Date().toISOString() };
+    setData((d) => d ? { ...d, todos: [...d.todos, placeholder] } : d);
     setNewTodo('');
     setNewTodoLevel('');
+    try {
+      const todo = await createTodo(text, levelLink);
+      setData((d) => d ? { ...d, todos: d.todos.map((t) => t.id === tempId ? todo : t) } : d);
+    } catch {
+      setData((d) => d ? { ...d, todos: d.todos.filter((t) => t.id !== tempId) } : d);
+    }
   };
 
   const handleToggle = async (todo: Todo) => {
-    const updated = await toggleTodo(todo.id, !todo.done);
-    setData((d) => d ? { ...d, todos: d.todos.map((t) => t.id === updated.id ? updated : t) } : d);
+    // Optimistic: flip immediately
+    setData((d) => d ? { ...d, todos: d.todos.map((t) => t.id === todo.id ? { ...t, done: !t.done } : t) } : d);
+    try {
+      const updated = await toggleTodo(todo.id, !todo.done);
+      setData((d) => d ? { ...d, todos: d.todos.map((t) => t.id === updated.id ? updated : t) } : d);
+    } catch {
+      setData((d) => d ? { ...d, todos: d.todos.map((t) => t.id === todo.id ? todo : t) } : d);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteTodo(id);
+    // Optimistic: remove immediately
     setData((d) => d ? { ...d, todos: d.todos.filter((t) => t.id !== id) } : d);
+    try {
+      await deleteTodo(id);
+    } catch {
+      // On failure the item is already gone from the list; a full reload would restore it
+    }
   };
 
   const handleDeadlineSave = async () => {
