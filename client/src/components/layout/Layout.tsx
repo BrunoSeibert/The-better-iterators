@@ -815,7 +815,7 @@ const closeAssistant = () => {
             >
               {activeLevel === 1 && <LiteratureReview />}
               {activeLevel === 2 && <Level2 />}
-              {activeLevel === 3 && <ResearchProposal onMarkComplete={() => setCompletionModal({ level: 3, value: '' })} />}
+              {activeLevel === 3 && <ResearchProposal onMarkComplete={() => setCompletionModal({ level: 3, value: '' })} alreadyCompleted={completedStages.includes(3)} />}
               {activeLevel === 4 && <ResearchWorkspace />}
               {activeLevel === 5 && (
                 levelSixCorrecting ? (

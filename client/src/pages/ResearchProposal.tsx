@@ -200,7 +200,7 @@ const DEFAULT_STATE: ProposalState = {
 };
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: () => void } = {}) {
+export default function ResearchProposal({ onMarkComplete, alreadyCompleted }: { onMarkComplete?: () => void; alreadyCompleted?: boolean } = {}) {
   const userId = useAuthStore((s) => s.user?.id ?? 'anon');
   const k = (key: string) => `${userId}:${key}`;
 
@@ -338,7 +338,7 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
   const copyProposal = () => {
     if (state.finalProposal) {
       navigator.clipboard.writeText(`# ${state.finalProposal.title}\n\n${state.finalProposal.body}`);
-      onMarkComplete?.();
+      if (!alreadyCompleted) onMarkComplete?.();
     }
   };
 
