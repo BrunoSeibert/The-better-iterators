@@ -6,22 +6,36 @@ const router = Router();
 
 const LEVEL_WEIGHTS = [0.15, 0.25, 0.40, 0.55, 0.80, 1.0];
 
-function toYMD(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+// pg returns DATE columns as local-midnight Date objects.
+// Serialising those with toISOString() shifts them back to the previous UTC day for UTC+ users.
+// Always convert to a plain 'YYYY-MM-DD' string using LOCAL date parts.
+function dateToStr(val: any): string | null {
+  if (val == null) return null;
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  // Already a string (some pg versions return DATE as 'YYYY-MM-DD')
+  return String(val).slice(0, 10);
 }
 
-function computeLevelDeadlines(mainDeadline: Date): Record<number, string> {
+function computeLevelDeadlines(mainDeadlineStr: string): Record<number, string> {
+  // Parse as local midnight so toYMD below uses the correct calendar date
+  const mainDate = new Date(mainDeadlineStr + 'T00:00:00');
   const today = new Date();
-  const totalMs = mainDeadline.getTime() - today.getTime();
+  today.setHours(0, 0, 0, 0);
+  const totalMs = mainDate.getTime() - today.getTime();
   const result: Record<number, string> = {};
   LEVEL_WEIGHTS.forEach((w, i) => {
     const d = new Date(today.getTime() + totalMs * w);
-    result[i + 1] = toYMD(d);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    result[i + 1] = `${y}-${mo}-${day}`;
   });
-  result[6] = toYMD(mainDeadline);
+  result[6] = mainDeadlineStr; // keep exact string the user entered
   return result;
 }
 
@@ -50,13 +64,13 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
         currentLevel: user.current_level,
       },
       deadlines: {
-        main: user.main_deadline,
-        level1: user.level1_deadline,
-        level2: user.level2_deadline,
-        level3: user.level3_deadline,
-        level4: user.level4_deadline,
-        level5: user.level5_deadline,
-        level6: user.level6_deadline,
+        main:   dateToStr(user.main_deadline),
+        level1: dateToStr(user.level1_deadline),
+        level2: dateToStr(user.level2_deadline),
+        level3: dateToStr(user.level3_deadline),
+        level4: dateToStr(user.level4_deadline),
+        level5: dateToStr(user.level5_deadline),
+        level6: dateToStr(user.level6_deadline),
       },
       todos: todosResult.rows,
       recentActivity: activityResult.rows,
@@ -71,8 +85,7 @@ router.patch('/deadline', requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthRequest).userId;
   const { mainDeadline } = req.body as { mainDeadline: string };
   try {
-    const d = new Date(mainDeadline);
-    const levels = computeLevelDeadlines(d);
+    const levels = computeLevelDeadlines(mainDeadline);
     await db.query(
       `UPDATE "User" SET main_deadline=$1, level1_deadline=$2, level2_deadline=$3,
        level3_deadline=$4, level4_deadline=$5, level5_deadline=$6, level6_deadline=$7
@@ -92,22 +105,20 @@ router.patch('/deadline/level/:level', requireAuth, async (req: Request, res: Re
   const { deadline } = req.body as { deadline: string };
   if (isNaN(level) || level < 1 || level > 6) return res.status(400).json({ error: 'Invalid level' });
   try {
-    // Fetch current level deadlines
     const result = await db.query(
       `SELECT level1_deadline, level2_deadline, level3_deadline, level4_deadline, level5_deadline, level6_deadline FROM "User" WHERE id = $1`,
       [userId]
     );
     const row = result.rows[0];
-    const newDate = deadline ? new Date(deadline) : null;
+    const newDate = deadline ? new Date(deadline + 'T00:00:00') : null;
 
-    // Build updated deadlines: cascade new date to later levels if their current deadline is earlier
     const updated: Record<number, string | null> = {};
     for (let l = 1; l <= 6; l++) {
-      const col = `level${l}_deadline`;
-      const current: string | null = row[col] ?? null;
+      // Normalise to 'YYYY-MM-DD' string so we never pass a Date object back to pg
+      const current = dateToStr(row[`level${l}_deadline`]);
       if (l === level) {
         updated[l] = deadline || null;
-      } else if (l > level && newDate && current && new Date(current) < newDate) {
+      } else if (l > level && newDate && current && new Date(current + 'T00:00:00') < newDate) {
         updated[l] = deadline;
       } else {
         updated[l] = current;

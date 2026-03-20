@@ -41,15 +41,13 @@ function isLevelUnlocked(level: number, completedStages: number[]) {
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
-  const diff = new Date(dateStr.slice(0, 10) + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0);
+  const diff = new Date(dateStr + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0);
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  // Slice to YYYY-MM-DD to avoid UTC→local timezone shift when the DB returns ISO datetime strings
-  const d = new Date(dateStr.slice(0, 10) + 'T00:00:00');
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function DeadlinePill({ days }: { days: number | null }) {
