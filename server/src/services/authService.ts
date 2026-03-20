@@ -144,12 +144,53 @@ export async function completeOnboarding(
   return { token: signToken(result.rows[0]) };
 }
 
+export async function updateProfile(
+  userId: string,
+  universityId: string,
+  studyProgramId: string,
+  degreeType: string,
+  fieldIds: string[],
+  advisorName: string | null,
+) {
+  await db.query(
+    `UPDATE "User" SET university_id = $1, study_program_id = $2, degree_type = $3, interests = $4::text[] WHERE id = $5`,
+    [universityId || null, studyProgramId || null, degreeType || null, fieldIds, userId]
+  );
+  if (advisorName !== null) {
+    const meta = await getLevelMetadata(userId);
+    await db.query(
+      `UPDATE "User" SET level_metadata = $1 WHERE id = $2`,
+      [JSON.stringify({ ...meta, 2: advisorName }), userId]
+    );
+  }
+}
+
 export async function getUserById(userId: string) {
   const result = await db.query(
-    'SELECT id, name, email, is_onboarded, current_level, completed_stages, first_login_date FROM "User" WHERE id = $1',
+    `SELECT u.id, u.name, u.email, u.is_onboarded, u.current_level, u.completed_stages, u.first_login_date,
+            u.degree_type, u.interests,
+            univ.name AS university_name,
+            sp.name AS study_program_name
+     FROM "User" u
+     LEFT JOIN universities univ ON univ.id = u.university_id
+     LEFT JOIN study_programs sp ON sp.id = u.study_program_id
+     WHERE u.id = $1`,
     [userId]
   );
-  return result.rows[0] ?? null;
+  const user = result.rows[0] ?? null;
+  if (!user) return null;
+
+  const interests: string[] = user.interests ?? [];
+  let interestNames: string[] = [];
+  if (interests.length > 0) {
+    const fieldsResult = await db.query(
+      'SELECT name FROM fields WHERE id = ANY($1::text[]) ORDER BY name',
+      [interests]
+    );
+    interestNames = fieldsResult.rows.map((r: { name: string }) => r.name);
+  }
+
+  return { ...user, interest_names: interestNames };
 }
 
 export async function completeLevelById(userId: string, level: number) {

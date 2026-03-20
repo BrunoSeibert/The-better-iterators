@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as authService from '@/services/authService';
+import { api } from '@/services/api';
 import { BADGES } from '@/utils/badges';
+
+interface University { id: string; name: string; country: string; }
+interface StudyProgram { id: string; name: string; degree: string; }
+interface Field { id: string; name: string; }
 
 const C = {
   darkBrown:  'rgba(38,38,38,1)',
@@ -15,6 +20,13 @@ const C = {
   mutedText:  'rgba(113,113,122,1)',
 };
 
+const DEGREE_OPTIONS = [
+  { label: 'Bachelor', value: 'bsc' },
+  { label: 'Master',   value: 'msc' },
+  { label: 'PhD',      value: 'phd' },
+];
+const DEGREE_LABELS: Record<string, string> = { bsc: 'Bachelor', msc: 'Master', phd: 'PhD' };
+
 export default function Profile() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -26,11 +38,36 @@ export default function Profile() {
   const completedStages = user?.completedStages ?? [];
 
   const [streak, setStreak] = useState<number | null>(() => authService.peekStreakSummary()?.currentStreak ?? null);
+  const [profileInfo, setProfileInfo] = useState<{
+    universityName: string | null;
+    studyProgramName: string | null;
+    degreeType: string | null;
+    interestNames: string[];
+  } | null>(null);
+  const [advisorName, setAdvisorName] = useState<string>('');
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [allFields, setAllFields] = useState<Field[]>([]);
+  const [studyPrograms, setStudyPrograms] = useState<StudyProgram[]>([]);
+
+  const [uniSearch, setUniSearch] = useState('');
+  const [universityId, setUniversityId] = useState('');
+  const [degreeType, setDegreeType] = useState('');
+  const [studyProgramId, setStudyProgramId] = useState('');
+  const [fieldIds, setFieldIds] = useState<string[]>([]);
+  const [editAdvisor, setEditAdvisor] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     authService.me()
       .then(({ user: refreshedUser }) => { useAuthStore.getState().setUser(refreshedUser); })
       .catch(() => {});
+    authService.getProfileInfo().then(setProfileInfo).catch(() => {});
+    authService.getLevelMetadata().then((meta) => {
+      setAdvisorName((meta as Record<string, string>)['2'] ?? '');
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -41,8 +78,70 @@ export default function Profile() {
     return () => { isMounted = false; };
   }, []);
 
+  // Load reference data when edit mode opens
+  useEffect(() => {
+    if (!editing) return;
+    api.get('/data/universities').then((r) => setUniversities(r.data)).catch(() => {});
+    api.get('/data/fields').then((r) => setAllFields(r.data)).catch(() => {});
+  }, [editing]);
+
+  // Load study programs when university + degree change
+  useEffect(() => {
+    if (!editing || !universityId || !degreeType) { setStudyPrograms([]); return; }
+    api.get(`/data/study-programs?universityId=${universityId}&degree=${degreeType}`)
+      .then((r) => setStudyPrograms(r.data))
+      .catch(() => {});
+  }, [editing, universityId, degreeType]);
+
+  function openEdit() {
+    setUniSearch(profileInfo?.universityName ?? '');
+    setUniversityId(''); // will be resolved via search
+    setDegreeType(profileInfo?.degreeType ?? '');
+    setStudyProgramId('');
+    setFieldIds([]); // will reload once we have the raw IDs
+    setEditAdvisor(advisorName);
+    setEditing(true);
+    // Load raw field IDs from the server
+    api.get('/auth/me').then((r) => {
+      const u = r.data.user;
+      setFieldIds(u.interests ?? []);
+      setUniversityId(u.university_id ?? '');
+      setStudyProgramId(u.study_program_id ?? '');
+    }).catch(() => {});
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await authService.updateProfile({
+        universityId,
+        studyProgramId,
+        degreeType,
+        fieldIds,
+        advisorName: editAdvisor.trim() || null,
+      });
+      const info = await authService.getProfileInfo();
+      setProfileInfo(info);
+      setAdvisorName(editAdvisor.trim());
+      setEditing(false);
+    } catch {
+      // keep editing open
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const filteredUniversities = universities.filter((u) =>
+    u.name.toLowerCase().includes(uniSearch.toLowerCase())
+  );
+
   const streakValue = streak ?? 0;
   const unlockedCount = BADGES.filter((b) => b.condition(streakValue, level)).length;
+
+  const rowStyle: React.CSSProperties = {
+    backgroundColor: 'rgba(255,255,255,1)',
+    border: '2px solid rgba(224,224,228,1)',
+  };
 
   return (
     <div className="min-h-screen px-4 py-12 sm:px-8" style={{ backgroundColor: C.warmWhite }}>
@@ -131,6 +230,172 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Academic Profile card */}
+        <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: '2px solid rgba(224,224,228,1)' }}>
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-base font-bold" style={{ color: C.darkBrown }}>Academic Profile</h2>
+            {!editing && (
+              <button
+                type="button"
+                onClick={openEdit}
+                className="text-xs font-semibold rounded-lg px-3 py-1.5 transition"
+                style={{ color: C.darkBrown, backgroundColor: C.lightTan, border: `2px solid ${C.border}` }}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          {!editing ? (
+            <div className="space-y-2">
+              {[
+                { label: 'University',  value: profileInfo?.universityName },
+                { label: 'Programme',   value: profileInfo?.studyProgramName },
+                { label: 'Degree',      value: profileInfo?.degreeType ? DEGREE_LABELS[profileInfo.degreeType] ?? profileInfo.degreeType : null },
+                { label: 'Advisor',     value: advisorName || null },
+              ].filter(({ value }) => value).map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between rounded-lg px-5 py-3.5" style={rowStyle}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>{label}</span>
+                  <span className="text-sm font-semibold text-right max-w-[60%]" style={{ color: C.darkBrown }}>{value}</span>
+                </div>
+              ))}
+              {(profileInfo?.interestNames.length ?? 0) > 0 && (
+                <div className="rounded-lg px-5 py-3.5" style={rowStyle}>
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>Research Interests</span>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {profileInfo!.interestNames.map((name) => (
+                      <span key={name} className="rounded-full px-3 py-1 text-xs font-medium"
+                        style={{ backgroundColor: C.lightTan, color: C.darkBrown, border: `2px solid ${C.border}` }}>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!profileInfo?.universityName && !profileInfo?.degreeType && !advisorName && (profileInfo?.interestNames.length ?? 0) === 0 && (
+                <p className="text-sm" style={{ color: C.mutedText }}>No academic info set yet.</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* University search */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>University</label>
+                <div className="relative">
+                  <input
+                    value={uniSearch}
+                    onChange={(e) => { setUniSearch(e.target.value); setUniversityId(''); }}
+                    placeholder="Search university…"
+                    className="w-full focus:outline-none"
+                    style={{ backgroundColor: C.warmWhite, border: `2px solid ${universityId ? C.darkBrown : C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.darkBrown }}
+                  />
+                  {uniSearch && !universityId && filteredUniversities.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 overflow-y-auto rounded-xl bg-white shadow-md" style={{ maxHeight: 180, border: `2px solid ${C.border}` }}>
+                      {filteredUniversities.slice(0, 8).map((u) => (
+                        <button key={u.id} type="button"
+                          onClick={() => { setUniversityId(u.id); setUniSearch(u.name); setStudyProgramId(''); }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-neutral-50"
+                          style={{ color: C.darkBrown }}
+                        >
+                          {u.name} <span style={{ color: C.mutedText }}>· {u.country}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Degree */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>Degree</label>
+                <div className="flex gap-2">
+                  {DEGREE_OPTIONS.map((d) => (
+                    <button key={d.value} type="button"
+                      onClick={() => { setDegreeType(d.value); setStudyProgramId(''); }}
+                      className="flex-1 rounded-xl py-2.5 text-sm font-medium transition"
+                      style={{
+                        border: `2px solid ${degreeType === d.value ? C.darkBrown : C.border}`,
+                        backgroundColor: degreeType === d.value ? C.darkBrown : C.warmWhite,
+                        color: degreeType === d.value ? C.cream : C.darkBrown,
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Study programme */}
+              {studyPrograms.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>Programme</label>
+                  <div className="overflow-y-auto rounded-xl" style={{ maxHeight: 160, border: `2px solid ${C.border}` }}>
+                    {studyPrograms.map((p) => (
+                      <button key={p.id} type="button"
+                        onClick={() => setStudyProgramId(p.id)}
+                        className="w-full text-left px-4 py-2.5 text-sm transition hover:bg-neutral-50"
+                        style={{
+                          backgroundColor: studyProgramId === p.id ? C.darkBrown : 'transparent',
+                          color: studyProgramId === p.id ? C.cream : C.darkBrown,
+                        }}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Advisor */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>Advisor / Supervisor</label>
+                <input
+                  value={editAdvisor}
+                  onChange={(e) => setEditAdvisor(e.target.value)}
+                  placeholder="e.g. Prof. Dr. Smith"
+                  className="w-full focus:outline-none"
+                  style={{ backgroundColor: C.warmWhite, border: `2px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.darkBrown }}
+                />
+              </div>
+
+              {/* Research interests */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>Research Interests</label>
+                <div className="flex flex-wrap gap-2">
+                  {allFields.map((f) => {
+                    const on = fieldIds.includes(f.id);
+                    return (
+                      <button key={f.id} type="button"
+                        onClick={() => setFieldIds((prev) => on ? prev.filter((id) => id !== f.id) : [...prev, f.id])}
+                        className="rounded-full px-3 py-1.5 text-xs font-medium transition"
+                        style={{
+                          border: `2px solid ${on ? C.darkBrown : C.border}`,
+                          backgroundColor: on ? C.darkBrown : C.warmWhite,
+                          color: on ? C.cream : C.darkBrown,
+                        }}
+                      >
+                        {f.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Save / Cancel */}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={save} disabled={saving}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 14, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.5 : 1 }}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" onClick={() => setEditing(false)} disabled={saving}
+                  style={{ padding: '10px 20px', borderRadius: 10, fontSize: 14, color: C.mutedText, backgroundColor: 'transparent', border: `2px solid ${C.border}`, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Account card */}
         <div className="rounded-xl px-8 py-7" style={{ backgroundColor: C.cream, border: '2px solid rgba(224,224,228,1)' }}>
           <h2 className="mb-5 text-base font-bold" style={{ color: C.darkBrown }}>Account</h2>
@@ -144,7 +409,7 @@ export default function Profile() {
               <div
                 key={label}
                 className="flex items-center justify-between rounded-lg px-5 py-3.5"
-                style={{ backgroundColor: 'rgba(255,255,255,1)', border: '2px solid rgba(224,224,228,1)' }}
+                style={rowStyle}
               >
                 <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.mutedText }}>{label}</span>
                 <span className="text-sm font-semibold" style={{ color: C.darkBrown }}>{value}</span>

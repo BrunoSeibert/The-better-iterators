@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getDashboard, updateMainDeadline, createTodo, toggleTodo, deleteTodo, completeLevel,
+  getDashboard, updateMainDeadline, updateLevelDeadline, createTodo, toggleTodo, deleteTodo, completeLevel,
   getLevelMetadata, setLevelMetadata,
   type DashboardData, type Todo, type DashboardDeadlines,
 } from '@/services/authService';
@@ -66,6 +66,8 @@ export default function Dashboard() {
   const [newTodoLevel, setNewTodoLevel] = useState<number | ''>('');
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState('');
+  const [editingLevelDeadline, setEditingLevelDeadline] = useState<number | null>(null);
+  const [levelDeadlineInput, setLevelDeadlineInput] = useState('');
   const streak = peekStreakSummary()?.currentStreak ?? 0;
 
   const [checkinOpen, setCheckinOpen] = useState(false);
@@ -88,10 +90,29 @@ export default function Dashboard() {
     }, 1500);
   };
   const [subtitles, setSubtitles] = useState<Record<number, string>>({});
+  const [editingSubtitle, setEditingSubtitle] = useState<number | null>(null);
+  const [subtitleInput, setSubtitleInput] = useState('');
+  const [subtitleSaving, setSubtitleSaving] = useState(false);
 
   useEffect(() => {
     getLevelMetadata().then((meta) => setSubtitles(meta as Record<number, string>)).catch(() => {});
   }, []);
+
+  const SUBTITLE_LABELS: Record<number, string> = {
+    1: 'Thesis topic', 2: 'Advisor name', 3: 'Research question',
+  };
+
+  async function saveSubtitle(level: number) {
+    if (!subtitleInput.trim()) return;
+    setSubtitleSaving(true);
+    try {
+      await setLevelMetadata(level, subtitleInput.trim());
+      setSubtitles((prev) => ({ ...prev, [level]: subtitleInput.trim() }));
+      setEditingSubtitle(null);
+    } finally {
+      setSubtitleSaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!completionModal) return;
@@ -185,9 +206,7 @@ export default function Dashboard() {
   };
   const displayName = user?.name?.split(' ')[0] ?? 'there';
 
-  const nextLevelDeadline = [1, 2, 3, 4, 5, 6]
-    .filter((l) => !completedStages.includes(l) && levelDeadlineMap[l])
-    .sort((a, b) => new Date(levelDeadlineMap[a]!).getTime() - new Date(levelDeadlineMap[b]!).getTime())[0];
+
 
   const sectionLabel = (text: string) => (
     <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: C.mutedText, marginBottom: 10 }}>{text}</p>
@@ -333,7 +352,49 @@ export default function Dashboard() {
                     <span style={{ fontSize: 11, color: C.mutedText }}>Level {level}</span>
                   </div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: C.darkBrown }}>{LEVEL_NAMES[level]}</p>
-                  {subtitles[level] && (
+                  {[1, 2, 3].includes(level) && completed && (
+                    editingSubtitle === level ? (
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          value={subtitleInput}
+                          onChange={(e) => setSubtitleInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveSubtitle(level); if (e.key === 'Escape') setEditingSubtitle(null); }}
+                          placeholder={SUBTITLE_LABELS[level]}
+                          style={{ width: '100%', fontSize: 11, padding: '4px 8px', borderRadius: 6, border: `1px solid ${C.tan}`, color: C.darkBrown, backgroundColor: 'white', outline: 'none' }}
+                        />
+                        <div className="mt-1 flex gap-1">
+                          <button
+                            onClick={() => saveSubtitle(level)}
+                            disabled={subtitleSaving || !subtitleInput.trim()}
+                            style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, border: 'none', backgroundColor: C.darkBrown, color: C.cream, cursor: 'pointer', opacity: subtitleSaving || !subtitleInput.trim() ? 0.4 : 1 }}
+                          >
+                            {subtitleSaving ? '…' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => setEditingSubtitle(null)}
+                            style={{ fontSize: 10, padding: '3px 10px', borderRadius: 99, border: `1px solid ${C.border}`, backgroundColor: 'transparent', color: C.mutedText, cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-center gap-1 group/sub" onClick={(e) => e.stopPropagation()}>
+                        <p style={{ fontSize: 11, color: C.mutedText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {subtitles[level] || <span style={{ fontStyle: 'italic' }}>Not set</span>}
+                        </p>
+                        <button
+                          onClick={() => { setSubtitleInput(subtitles[level] ?? ''); setEditingSubtitle(level); }}
+                          className="opacity-0 group-hover/sub:opacity-100 transition"
+                          style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.warmWhite, color: C.mutedText, cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          ✎
+                        </button>
+                      </div>
+                    )
+                  )}
+                  {![1, 2, 3].includes(level) && subtitles[level] && (
                     <p style={{ fontSize: 11, color: C.mutedText, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {subtitles[level]}
                     </p>
@@ -369,51 +430,93 @@ export default function Dashboard() {
           <section>
             {sectionLabel('Thesis Deadline')}
             {card(<>
-              {!editingDeadline ? (<>
-                <div>
-                  <p style={{ fontSize: 11, color: C.mutedText }}>Submission date</p>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: C.darkBrown, marginTop: 2 }}>{formatDate(deadlines.main)}</p>
-                  {nextLevelDeadline && (
-                    <p style={{ fontSize: 11, color: C.mutedText, marginTop: 4 }}>
-                      Next: Level {nextLevelDeadline} ({LEVEL_NAMES[nextLevelDeadline]}) — {formatDate(levelDeadlineMap[nextLevelDeadline])}{' '}
-                      <DeadlinePill days={daysUntil(levelDeadlineMap[nextLevelDeadline])} />
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => { setDeadlineInput(deadlines.main ?? ''); setEditingDeadline(true); }}
-                  style={{ marginTop: 10, fontSize: 12, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                >
-                  {deadlines.main ? 'Change deadline' : 'Set deadline'}
-                </button>
-              </>) : (<>
-                <DatePicker
-                  value={deadlineInput}
-                  onChange={setDeadlineInput}
-                  min={new Date().toISOString().slice(0, 10)}
-                />
-                <div className="flex gap-2">
-                  <button onClick={handleDeadlineSave} style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}>Save</button>
-                  <button onClick={() => setEditingDeadline(false)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 13, color: C.mutedText, background: 'none', border: `2px solid ${C.border}`, cursor: 'pointer' }}>Cancel</button>
-                </div>
-              </>)}
+              {/* Main deadline */}
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: 11, color: C.mutedText }}>Submission date</p>
+                {!editingDeadline ? (
+                  <div className="flex items-center justify-between">
+                    <p style={{ fontSize: 18, fontWeight: 700, color: C.darkBrown, marginTop: 2 }}>{formatDate(deadlines.main)}</p>
+                    <button
+                      onClick={() => { setDeadlineInput(deadlines.main ?? ''); setEditingDeadline(true); }}
+                      style={{ fontSize: 11, color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                    >
+                      {deadlines.main ? 'Change' : 'Set'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <DatePicker value={deadlineInput} onChange={setDeadlineInput} min={new Date().toISOString().slice(0, 10)} />
+                    <div className="flex gap-2">
+                      <button onClick={handleDeadlineSave} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}>Save</button>
+                      <button onClick={() => setEditingDeadline(false)} style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12, color: C.mutedText, background: 'none', border: `2px solid ${C.border}`, cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              {deadlines.main && (
-                <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 14, paddingTop: 12 }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.mutedText, marginBottom: 8 }}>Suggested level deadlines</p>
-                  {[1, 2, 3, 4, 5, 6].map((l) => {
-                    const done = completedStages.includes(l);
-                    return (
-                      <div key={l} className="flex items-center justify-between" style={{ marginBottom: 5 }}>
+              {/* Per-level deadlines */}
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: C.mutedText, marginBottom: 8 }}>Level deadlines</p>
+                {[1, 2, 3, 4, 5, 6].map((l) => {
+                  const done = completedStages.includes(l);
+                  const isEditingThis = editingLevelDeadline === l;
+                  return (
+                    <div key={l} style={{ marginBottom: 8 }}>
+                      <div className="group/dl flex items-center justify-between">
                         <span style={{ fontSize: 12, color: done ? C.mutedText : C.midBrown, textDecoration: done ? 'line-through' : 'none' }}>
                           Level {l} · {LEVEL_NAMES[l]}
                         </span>
-                        {done ? <span style={{ fontSize: 12, color: 'rgba(80,160,40,1)' }}>✓</span> : <DeadlinePill days={daysUntil(levelDeadlineMap[l])} />}
+                        <div className="flex items-center gap-2">
+                          {done
+                            ? <span style={{ fontSize: 12, color: 'rgba(80,160,40,1)' }}>✓</span>
+                            : <DeadlinePill days={daysUntil(levelDeadlineMap[l])} />
+                          }
+                          {!isEditingThis && (
+                            <button
+                              onClick={() => { setLevelDeadlineInput(levelDeadlineMap[l] ?? ''); setEditingLevelDeadline(l); }}
+                              className="opacity-0 group-hover/dl:opacity-100 transition"
+                              style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, border: `1px solid ${C.border}`, backgroundColor: C.warmWhite, color: C.mutedText, cursor: 'pointer' }}
+                            >
+                              ✎
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      {isEditingThis && (
+                        <div className="mt-1.5 flex flex-col gap-1.5">
+                          <DatePicker value={levelDeadlineInput} onChange={setLevelDeadlineInput} min={new Date().toISOString().slice(0, 10)} />
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={async () => {
+                                const { levels } = await updateLevelDeadline(l, levelDeadlineInput);
+                                setData((d) => d ? {
+                                  ...d,
+                                  deadlines: {
+                                    ...d.deadlines,
+                                    level1: levels[1] ?? null, level2: levels[2] ?? null,
+                                    level3: levels[3] ?? null, level4: levels[4] ?? null,
+                                    level5: levels[5] ?? null, level6: levels[6] ?? null,
+                                  },
+                                } : d);
+                                setEditingLevelDeadline(null);
+                              }}
+                              style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, backgroundColor: C.darkBrown, color: C.cream, border: 'none', cursor: 'pointer' }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingLevelDeadline(null)}
+                              style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, color: C.mutedText, background: 'none', border: `2px solid ${C.border}`, cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </>)}
           </section>
 

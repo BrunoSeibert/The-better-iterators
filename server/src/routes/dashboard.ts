@@ -78,6 +78,45 @@ router.patch('/deadline', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/dashboard/deadline/level/:level — update a single level deadline, cascade forward
+router.patch('/deadline/level/:level', requireAuth, async (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).userId;
+  const level = parseInt(req.params.level, 10);
+  const { deadline } = req.body as { deadline: string };
+  if (isNaN(level) || level < 1 || level > 6) return res.status(400).json({ error: 'Invalid level' });
+  try {
+    // Fetch current level deadlines
+    const result = await db.query(
+      `SELECT level1_deadline, level2_deadline, level3_deadline, level4_deadline, level5_deadline, level6_deadline FROM "User" WHERE id = $1`,
+      [userId]
+    );
+    const row = result.rows[0];
+    const newDate = deadline ? new Date(deadline) : null;
+
+    // Build updated deadlines: cascade new date to later levels if their current deadline is earlier
+    const updated: Record<number, string | null> = {};
+    for (let l = 1; l <= 6; l++) {
+      const col = `level${l}_deadline`;
+      const current: string | null = row[col] ?? null;
+      if (l === level) {
+        updated[l] = deadline || null;
+      } else if (l > level && newDate && current && new Date(current) < newDate) {
+        updated[l] = deadline;
+      } else {
+        updated[l] = current;
+      }
+    }
+
+    await db.query(
+      `UPDATE "User" SET level1_deadline=$1, level2_deadline=$2, level3_deadline=$3, level4_deadline=$4, level5_deadline=$5, level6_deadline=$6 WHERE id=$7`,
+      [updated[1], updated[2], updated[3], updated[4], updated[5], updated[6], userId]
+    );
+    res.json({ levels: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/dashboard/todos
 router.post('/todos', requireAuth, async (req: Request, res: Response) => {
   const userId = (req as AuthRequest).userId;

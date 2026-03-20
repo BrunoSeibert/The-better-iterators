@@ -101,6 +101,32 @@ export async function me() {
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
 }
 
+export async function updateProfile(data: {
+  universityId: string;
+  studyProgramId: string;
+  degreeType: string;
+  fieldIds: string[];
+  advisorName: string | null;
+}): Promise<void> {
+  await api.patch('/auth/profile', data);
+}
+
+export async function getProfileInfo(): Promise<{
+  universityName: string | null;
+  studyProgramName: string | null;
+  degreeType: string | null;
+  interestNames: string[];
+}> {
+  const res = await api.get('/auth/me');
+  const u = res.data.user;
+  return {
+    universityName: u.university_name ?? null,
+    studyProgramName: u.study_program_name ?? null,
+    degreeType: u.degree_type ?? null,
+    interestNames: Array.isArray(u.interest_names) ? u.interest_names : [],
+  };
+}
+
 export async function resetLevel() {
   const res = await api.post('/auth/level/reset');
   return { ...res.data, user: normalizeUser(res.data.user) } as { user: AuthUser };
@@ -454,6 +480,11 @@ export async function getDashboard(): Promise<DashboardData> {
 export async function updateMainDeadline(mainDeadline: string) {
   const res = await api.patch('/dashboard/deadline', { mainDeadline });
   return res.data as { mainDeadline: string; levels: Record<number, string> };
+}
+
+export async function updateLevelDeadline(level: number, deadline: string) {
+  const res = await api.patch(`/dashboard/deadline/level/${level}`, { deadline });
+  return res.data as { levels: Record<number, string | null> };
 }
 export async function createTodo(text: string, levelLink?: number) {
   const res = await api.post('/dashboard/todos', { text, levelLink });

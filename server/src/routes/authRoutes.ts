@@ -10,6 +10,7 @@ import {
   completeLevelById,
   getLevelMetadata,
   setLevelMetadata,
+  updateProfile,
 } from '../controllers/authController';
 import { requireAuth } from '../middleware/auth';
 
@@ -25,5 +26,6 @@ router.post('/level/progress', requireAuth, progressLevel);
 router.post('/level/:level/complete', requireAuth, completeLevelById);
 router.get('/level-metadata', requireAuth, getLevelMetadata);
 router.patch('/level-metadata/:level', requireAuth, setLevelMetadata);
+router.patch('/profile', requireAuth, updateProfile);
 
 export default router;

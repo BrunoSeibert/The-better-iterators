@@ -130,6 +130,17 @@ export async function completeLevelById(req: AuthedRequest, res: Response) {
   }
 }
 
+export async function updateProfile(req: AuthedRequest, res: Response) {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { universityId, studyProgramId, degreeType, fieldIds, advisorName } = req.body;
+    await authService.updateProfile(req.userId, universityId ?? '', studyProgramId ?? '', degreeType ?? '', fieldIds ?? [], advisorName ?? null);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Unknown error' });
+  }
+}
+
 export async function streakSummary(req: AuthedRequest, res: Response) {
   try {
     if (!req.userId) {

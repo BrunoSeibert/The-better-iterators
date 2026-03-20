@@ -35,8 +35,14 @@ const THESIS_STAGES: { label: string; currentLevel: number; getCompleted: (hasAd
   { label: "I'm preparing for my defense",           currentLevel: 6, getCompleted: () => [1, 2, 3, 4, 5] },
 ];
 
-type Step = 'info' | 'interests' | 'advisor' | 'stage' | 'deadline';
+type Step = 'info' | 'interests' | 'advisor' | 'stage' | 'metadata' | 'deadline';
 const STEP_ORDER: Step[] = ['info', 'interests', 'advisor', 'stage', 'deadline'];
+
+const METADATA_PROMPTS: Record<number, { label: string; placeholder: string }> = {
+  1: { label: 'What is your thesis topic?',       placeholder: 'e.g. The impact of social media on political polarisation' },
+  2: { label: 'Who is your advisor / supervisor?', placeholder: "e.g. Prof. Dr. Smith" },
+  3: { label: 'What is your research question?',   placeholder: 'e.g. How does X influence Y in context Z?' },
+};
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -70,9 +76,15 @@ export default function OnboardingPage() {
   const [hasAdvisor, setHasAdvisor] = useState<boolean | null>(null);
   const [pendingStages, setPendingStages] = useState<{ currentLevel: number; completedStages: number[] } | null>(null);
   const [mainDeadline, setMainDeadline] = useState('');
+  const [metadataQueue, setMetadataQueue] = useState<number[]>([]);
+  const [metadataValues, setMetadataValues] = useState<Record<number, string>>({});
+  const [metadataInput, setMetadataInput] = useState('');
 
-  const stepIndex = STEP_ORDER.indexOf(step);
-  const progress = ((stepIndex + 1) / STEP_ORDER.length) * 100;
+  const stepIndex = step === 'metadata'
+    ? STEP_ORDER.indexOf('stage') + 0.5
+    : STEP_ORDER.indexOf(step);
+  const totalSteps = STEP_ORDER.length;
+  const progress = ((stepIndex + 1) / totalSteps) * 100;
 
   useEffect(() => {
     api.get('/data/universities').then((r) => setUniversities(r.data));
@@ -90,7 +102,10 @@ export default function OnboardingPage() {
   }
 
   function goBack() {
-    const prev = STEP_ORDER[stepIndex - 1];
+    if (step === 'metadata') { setStep('stage'); return; }
+    if (step === 'deadline' && metadataQueue.length > 0) { setStep('metadata'); return; }
+    const idx = STEP_ORDER.indexOf(step as Exclude<Step, 'metadata'>);
+    const prev = STEP_ORDER[idx - 1];
     if (prev) setStep(prev);
   }
 
@@ -98,7 +113,30 @@ export default function OnboardingPage() {
     const completedStages = stage.getCompleted(hasAdvisor ?? false);
     const currentLevel = stage.currentLevel;
     setPendingStages({ currentLevel, completedStages });
-    setStep('deadline');
+    const needsMeta = [1, 2, 3].filter((l) => completedStages.includes(l));
+    if (needsMeta.length > 0) {
+      setMetadataQueue(needsMeta);
+      setMetadataValues({});
+      setMetadataInput('');
+      setStep('metadata');
+    } else {
+      setStep('deadline');
+    }
+  }
+
+  function handleMetadataNext() {
+    const currentLevel = metadataQueue[0];
+    if (!metadataInput.trim()) return;
+    const newValues = { ...metadataValues, [currentLevel]: metadataInput.trim() };
+    setMetadataValues(newValues);
+    const remaining = metadataQueue.slice(1);
+    setMetadataQueue(remaining);
+    setMetadataInput('');
+    if (remaining.length > 0) {
+      // stay on metadata step for next question
+    } else {
+      setStep('deadline');
+    }
   }
 
   async function handleDeadlineSubmit() {
@@ -110,6 +148,12 @@ export default function OnboardingPage() {
         currentLevel, completedStages, universityId, studyProgramId, degreeType, fieldIds,
         mainDeadline: mainDeadline || undefined,
       });
+      // Save metadata for completed levels 1/2/3
+      await Promise.all(
+        Object.entries(metadataValues).map(([level, value]) =>
+          authService.setLevelMetadata(Number(level), value)
+        )
+      );
       setAuth({ ...user!, isOnboarded: true, currentLevel, completedStages }, result.token);
       navigate('/dashboard');
     } catch {
@@ -307,6 +351,41 @@ export default function OnboardingPage() {
             <button onClick={goBack} className="mt-6 text-sm hover:underline" style={{ color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}>← Back</button>
           </>
         )}
+
+        {/* Step 4b: Metadata for completed levels */}
+        {step === 'metadata' && (() => {
+          const currentLevel = metadataQueue[0];
+          const prompt = METADATA_PROMPTS[currentLevel];
+          if (!prompt) return null;
+          return (
+            <>
+              <h1 className="text-3xl font-bold mb-3 text-center" style={{ color: C.darkBrown }}>
+                {prompt.label}
+              </h1>
+              <p className="text-sm text-center mb-8" style={{ color: C.mutedText }}>
+                This helps personalise your experience.
+              </p>
+              <div className="w-full space-y-4">
+                <input
+                  value={metadataInput}
+                  onChange={(e) => setMetadataInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleMetadataNext(); }}
+                  placeholder={prompt.placeholder}
+                  style={inputStyle}
+                  autoFocus
+                />
+                <button
+                  onClick={handleMetadataNext}
+                  disabled={!metadataInput.trim()}
+                  style={{ ...primaryBtn, opacity: metadataInput.trim() ? 1 : 0.4, cursor: metadataInput.trim() ? 'pointer' : 'not-allowed' }}
+                >
+                  Continue →
+                </button>
+              </div>
+              <button onClick={goBack} className="mt-6 text-sm hover:underline" style={{ color: C.mutedText, background: 'none', border: 'none', cursor: 'pointer' }}>← Back</button>
+            </>
+          );
+        })()}
 
         {/* Step 5: Deadline */}
         {step === 'deadline' && (
