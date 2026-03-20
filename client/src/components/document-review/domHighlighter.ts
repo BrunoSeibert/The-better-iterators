@@ -61,14 +61,17 @@ export const applyHighlightsToContainer = (
   const highlightLayer = document.createElement('div');
   highlightLayer.className = 'document-review-highlight-layer';
   highlightLayer.dataset.reviewHighlightLayer = 'true';
+  highlightLayer.dataset.reviewIgnore = 'true';
   root.append(highlightLayer);
 
   const markerLayer = document.createElement('div');
   markerLayer.className = 'document-review-marker-layer';
-  document.body.append(markerLayer);
+  markerLayer.dataset.reviewIgnore = 'true';
+  root.append(markerLayer);
 
   const tooltipLayer = document.createElement('div');
   tooltipLayer.className = 'document-review-tooltip-layer';
+  tooltipLayer.dataset.reviewIgnore = 'true';
   document.body.append(tooltipLayer);
 
   const annotationsById = new Map<string, ReviewAnnotation>();
@@ -86,10 +89,10 @@ export const applyHighlightsToContainer = (
     if (!highlightLayer.isConnected || highlightLayer.parentElement !== root) {
       root.append(highlightLayer);
     }
-    if (!markerLayer.isConnected) {
-      document.body.append(markerLayer);
+    if (!markerLayer.isConnected || markerLayer.parentElement !== root) {
+      root.append(markerLayer);
     }
-    if (!tooltipLayer.isConnected) {
+    if (!tooltipLayer.isConnected || tooltipLayer.parentElement !== document.body) {
       document.body.append(tooltipLayer);
     }
 
@@ -104,9 +107,9 @@ export const applyHighlightsToContainer = (
     }
 
     const renderedTokenRects = collectRenderedTokenRects(root, currentWordAnnotations, currentStartingWordIndex);
-    const geometries = buildAnnotationGeometries(root, annotationsById, renderedTokenRects);
+    const geometries = buildAnnotationGeometries(annotationsById, renderedTokenRects);
     drawTokenRects(highlightLayer, geometries);
-    drawMarkers(markerLayer, tooltipLayer, geometries, activeAnnotationId, setActiveAnnotationId);
+    drawMarkers(root, markerLayer, tooltipLayer, geometries, activeAnnotationId, setActiveAnnotationId);
 
     if (currentDocumentModel) {
       logBodyTokenValidation(currentDocumentModel, annotationsById, renderedTokenRects);
@@ -115,12 +118,24 @@ export const applyHighlightsToContainer = (
 
   rerender();
 
-  const handleWindowChange = () => {
-    rerender();
+  let frameId: number | null = null;
+  const handleViewportChange = () => {
+    if (!activeAnnotationId) {
+      return;
+    }
+
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+    }
+
+    frameId = window.requestAnimationFrame(() => {
+      frameId = null;
+      rerender();
+    });
   };
 
-  window.addEventListener('scroll', handleWindowChange, true);
-  window.addEventListener('resize', handleWindowChange);
+  window.addEventListener('scroll', handleViewportChange, true);
+  window.addEventListener('resize', handleViewportChange);
 
   const resizeObserver = new ResizeObserver(() => {
     rerender();
@@ -128,8 +143,11 @@ export const applyHighlightsToContainer = (
   resizeObserver.observe(root);
 
   const cleanup = () => {
-    window.removeEventListener('scroll', handleWindowChange, true);
-    window.removeEventListener('resize', handleWindowChange);
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+    }
+    window.removeEventListener('scroll', handleViewportChange, true);
+    window.removeEventListener('resize', handleViewportChange);
     resizeObserver.disconnect();
     activeAnnotationRegistry.set(root, activeAnnotationId);
     markerLayer.remove();
@@ -236,7 +254,6 @@ const collectReviewTextNodes = (root: HTMLElement) => {
 };
 
 const buildAnnotationGeometries = (
-  root: HTMLElement,
   annotationsById: Map<string, ReviewAnnotation>,
   renderedTokenRects: Map<number, TokenRect[]>
 ) => {
@@ -257,7 +274,7 @@ const buildAnnotationGeometries = (
       annotation,
       rects: mergedRects,
       unionRect: computeUnionRect(mergedRects),
-      markerAnchor: getMarkerAnchor(root, computeUnionRect(mergedRects)),
+      markerAnchor: getMarkerAnchor(computeUnionRect(mergedRects)),
     });
   });
 
@@ -290,6 +307,7 @@ const drawTokenRects = (
 };
 
 const drawMarkers = (
+  root: HTMLElement,
   markerLayer: HTMLElement,
   tooltipLayer: HTMLElement,
   geometries: AnnotationGeometry[],
@@ -341,14 +359,18 @@ const drawMarkers = (
     body.textContent = geometry.annotation.comment;
 
     const preferredLeft = geometry.markerAnchor.left + 12;
-    const tooltipMaxWidth = Math.min(448, window.innerWidth * 0.48);
+    const rootWidth = Math.max(root.clientWidth, root.scrollWidth);
+    const tooltipMaxWidth = Math.min(448, rootWidth * 0.48);
     const clampedLeft = Math.min(
       preferredLeft,
-      Math.max(30, window.innerWidth - tooltipMaxWidth - 30)
+      Math.max(12, rootWidth - tooltipMaxWidth - 12)
     );
+    const rootRect = root.getBoundingClientRect();
+    const tooltipViewportLeft = Math.max(12, Math.min(rootRect.left + clampedLeft, window.innerWidth - tooltipMaxWidth - 12));
+    const tooltipViewportTop = Math.max(12, rootRect.top + geometry.markerAnchor.top + 20);
 
-    tooltip.style.left = `${clampedLeft}px`;
-    tooltip.style.top = `${geometry.markerAnchor.top + 20}px`;
+    tooltip.style.left = `${tooltipViewportLeft}px`;
+    tooltip.style.top = `${tooltipViewportTop}px`;
     header.append(closeButton);
     tooltip.append(header);
     tooltip.append(body);
@@ -470,12 +492,10 @@ const computeUnionRect = (rects: TokenRect[]): Rect => {
   };
 };
 
-const getMarkerAnchor = (root: HTMLElement, unionRect: Rect) => {
-  const rootRect = root.getBoundingClientRect();
-
+const getMarkerAnchor = (unionRect: Rect) => {
   return {
-    left: rootRect.left + unionRect.right + 6,
-    top: rootRect.top + unionRect.top - 10,
+    left: unionRect.right + 6,
+    top: Math.max(0, unionRect.top - 10),
   };
 };
 

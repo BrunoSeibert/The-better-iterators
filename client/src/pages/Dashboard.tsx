@@ -269,17 +269,17 @@ export default function Dashboard() {
         <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center"
           style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', animation: 'levelup-backdrop-in 0.3s ease forwards' }}>
           <div className="flex flex-col items-center gap-5 px-14 py-10 text-center"
-            style={{ backgroundColor: 'rgba(252,248,243,1)', border: '1px solid rgba(196,177,160,1)', borderRadius: 18, boxShadow: '0 8px 40px rgba(81,60,45,0.22)', animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+            style={{ backgroundColor: 'rgba(250,250,250,1)', border: '2px solid rgba(212,212,216,1)', borderRadius: 18, boxShadow: '0 8px 40px rgba(0,0,0,0.12)', animation: levelUpExiting ? 'levelup-card-out 0.4s ease forwards' : 'levelup-card-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
             <div className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{ backgroundColor: 'rgba(81,60,45,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}>
-              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(252,248,243,1)' }}>
+              style={{ backgroundColor: 'rgba(38,38,38,1)', animation: 'levelup-check 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both' }}>
+              <svg viewBox="0 0 24 24" className="h-8 w-8" style={{ fill: 'rgba(250,250,250,1)' }}>
                 <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
               </svg>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(140,115,95,1)' }}>Congratulations</p>
-              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(81,60,45,1)' }}>One step closer to your thesis</p>
-              {levelUpNumber && <p className="mt-2 text-sm" style={{ color: 'rgba(140,115,95,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>}
+              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(113,113,122,1)' }}>Congratulations</p>
+              <p className="mt-1 text-2xl font-semibold" style={{ color: 'rgba(38,38,38,1)' }}>One step closer to your thesis</p>
+              {levelUpNumber && <p className="mt-2 text-sm" style={{ color: 'rgba(113,113,122,1)' }}>{LEVEL_NAMES[levelUpNumber]} is now unlocked</p>}
             </div>
           </div>
         </div>

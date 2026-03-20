@@ -264,6 +264,12 @@ export type PaperAnalysis = {
   followUpPapers: { title: string; authors: string; year?: string; why: string }[];
 };
 
+type LiteratureAnalyzeNotFound = {
+  status: 'not_found';
+  reason: string;
+  confidence: 'low';
+};
+
 export async function literatureStart(): Promise<Phase1Data> {
   const res = await api.post('/literature', { phase: 1 });
   return res.data;
@@ -296,8 +302,16 @@ export async function literatureAnalyze(
   papers: PaperAnalysis[],
   feedback: Record<number, 'liked' | 'disliked'>
 ): Promise<PaperAnalysis> {
-  const res = await api.post('/literature', { phase: 2, input, papers, feedback });
-  return { ...res.data, input };
+  try {
+    const res = await api.post('/literature', { phase: 2, input, papers, feedback });
+    return { ...res.data, input };
+  } catch (error: any) {
+    const data = error?.response?.data as LiteratureAnalyzeNotFound | undefined;
+    if (error?.response?.status === 422 && data?.status === 'not_found') {
+      throw new Error(data.reason);
+    }
+    throw error;
+  }
 }
 
 export type ProposalMessage = { role: 'user' | 'assistant'; content: string };
@@ -342,13 +356,28 @@ export type ResearchPaper = {
   created_at: string;
 };
 
-export type FoundPaper = {
-  title: string;
-  authors: string;
-  year: number;
-  why: string;
-  scholarUrl: string;
-};
+export type FoundPaper =
+  | {
+      status: 'found';
+      title: string;
+      authors: string[];
+      summary: string;
+      confidence: 'high';
+      year?: number;
+      why?: string;
+      scholarUrl?: string;
+    }
+  | {
+      status: 'not_found';
+      reason: string;
+      confidence: 'low';
+      title?: string;
+      authors?: string[] | string;
+      summary?: string;
+      year?: number;
+      why?: string;
+      scholarUrl?: string;
+    };
 
 export type SourceCheckResult = {
   sourceType?: string;
@@ -401,7 +430,7 @@ export async function deleteResearchPaper(id: number): Promise<void> {
 
 export async function researchFindPapers(topic: string): Promise<FoundPaper[]> {
   const res = await api.post('/research/find-papers', { topic });
-  return res.data.papers;
+  return [res.data.result];
 }
 
 export async function researchCheckSource(paperId: number): Promise<SourceCheckResult> {

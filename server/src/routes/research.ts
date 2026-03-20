@@ -162,6 +162,39 @@ router.delete('/library/:id/pdf', requireAuth, async (req: Request, res: Respons
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 type Paper = { id: number; title: string; authors?: string; year?: number; abstract?: string };
+type PaperLookupResult =
+  | {
+      status: 'found';
+      title: string;
+      authors: string[];
+      summary: string;
+      confidence: 'high' | 'medium';
+    }
+  | {
+      status: 'suggested';
+      papers: Array<{
+        title: string;
+        authors: string[];
+        why: string;
+      }>;
+      confidence: 'medium';
+    }
+  | {
+      status: 'not_found';
+      reason: string;
+      confidence: 'low';
+    };
+
+type ModelPaperLookupResult =
+  | {
+      status: 'found' | 'suggested' | 'not_found';
+      title?: unknown;
+      authors?: unknown;
+      summary?: unknown;
+      reason?: unknown;
+      confidence?: unknown;
+      suggestions?: unknown;
+    };
 
 function libraryContext(papers: Paper[]): string {
   if (papers.length === 0) return 'The student has no papers in their library yet.';
@@ -172,15 +205,175 @@ function libraryContext(papers: Paper[]): string {
 
 // ── AI Tools ────────────────────────────────────────────────────────────────
 
+function tokenizeQuery(query: string): string[] {
+  return query.toLowerCase().match(/[a-z]{2,}/g) ?? [];
+}
+
+function isObviouslyInvalidPaperQuery(query: string): boolean {
+  const trimmed = query.trim();
+  if (trimmed.length < 3) return true;
+  return /^[a-z]{1,4}$/i.test(trimmed);
+}
+
+function normalizePaperLookupResult(value: unknown): PaperLookupResult {
+  const candidate = value as ModelPaperLookupResult | null | undefined;
+  const authors = Array.isArray(candidate?.authors)
+    ? candidate.authors.filter((author): author is string => typeof author === 'string' && author.trim().length > 0).map((author) => author.trim())
+    : [];
+  const summary = typeof candidate?.summary === 'string' ? candidate.summary.trim() : '';
+  const suggestions = Array.isArray(candidate?.suggestions)
+    ? candidate.suggestions
+        .map((item) => {
+          const suggestion = item as { title?: unknown; authors?: unknown; why?: unknown };
+          const title = typeof suggestion.title === 'string' ? suggestion.title.trim() : '';
+          const suggestionAuthors = Array.isArray(suggestion.authors)
+            ? suggestion.authors.filter((author): author is string => typeof author === 'string' && author.trim().length > 0).map((author) => author.trim())
+            : [];
+          const why = typeof suggestion.why === 'string' ? suggestion.why.trim() : '';
+
+          if (!title) return null;
+          return { title, authors: suggestionAuthors, why };
+        })
+        .filter((item): item is { title: string; authors: string[]; why: string } => item !== null)
+        .slice(0, 3)
+    : [];
+
+  if (
+    candidate?.status === 'found'
+    && typeof candidate.title === 'string'
+    && candidate.title.trim().length > 0
+  ) {
+    return {
+      status: 'found',
+      title: candidate.title.trim(),
+      authors,
+      summary: summary || (typeof candidate?.reason === 'string' && candidate.reason.trim().length > 0
+        ? candidate.reason.trim()
+        : 'Likely research paper match.'),
+      confidence: candidate.confidence === 'high' ? 'high' : 'medium',
+    };
+  }
+
+  if (
+    candidate?.status === 'suggested'
+    && suggestions.length > 0
+  ) {
+    return {
+      status: 'suggested',
+      papers: suggestions,
+      confidence: 'medium',
+    };
+  }
+
+  if (
+    candidate?.status === 'found'
+    && suggestions.length > 0
+  ) {
+    return {
+      status: 'suggested',
+      papers: suggestions,
+      confidence: 'medium',
+    };
+  }
+
+  const reason = typeof candidate?.reason === 'string' && candidate.reason.trim().length > 0
+    ? candidate.reason.trim()
+    : 'The input appears invalid or too weak to match to a research paper.';
+
+  return {
+    status: 'not_found',
+    reason,
+    confidence: 'low',
+  };
+}
+
 // POST /api/research/find-papers
 router.post('/find-papers', requireAuth, async (req: Request, res: Response) => {
   const { topic } = req.body;
   const userId = (req as AuthRequest).userId;
   if (!topic) { res.status(400).json({ error: 'topic is required' }); return; }
+  if (isObviouslyInvalidPaperQuery(topic)) {
+    res.json({
+      result: {
+        status: 'not_found',
+        reason: 'The input appears invalid or too weak to match to a research paper.',
+        confidence: 'low',
+      } satisfies PaperLookupResult,
+    });
+    return;
+  }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
     const thesisCtx = await getThesisContext(userId);
+    const strictCompletion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a research paper assistant.${thesisCtx}
+
+Your job is to interpret ANY reasonable input and generate useful academic results.
+
+CRITICAL RULE:
+Only reject inputs that are clearly nonsense or random characters.
+
+Everything else is valid.
+
+Behavior:
+
+1. If input is obvious nonsense:
+-> return not_found
+
+2. Otherwise ALWAYS respond with useful output.
+
+3. Interpret flexibly:
+- If input is a topic (e.g. "Architectural wonders"):
+  -> generate 2-3 strong academic-style papers in that area
+
+- If input resembles a paper title:
+  -> return a likely paper (you may fix small errors)
+
+4. Do NOT be strict.
+5. Do NOT require exact matches.
+6. Do NOT reject valid topics.
+7. Do NOT say "cannot find" unless input is truly garbage.
+
+You are encouraged to:
+- interpret
+- expand
+- infer
+- generate realistic academic content
+
+Respond ONLY with valid JSON:
+{
+  "status": "found | suggested | not_found",
+  "title": "...",
+  "authors": ["...", "..."],
+  "summary": "...",
+  "reason": "...",
+  "confidence": "high | medium | low",
+  "suggestions": [
+    {
+      "title": "...",
+      "authors": ["...", "..."],
+      "why": "..."
+    }
+  ]
+}`,
+        },
+        {
+          role: 'user',
+          content: `Interpret this research paper lookup input and return the most useful result you can:\n\n${topic}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const strictParsed = JSON.parse(strictCompletion.choices[0].message.content ?? '{}');
+    res.json({ result: normalizePaperLookupResult(strictParsed) });
+    return;
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

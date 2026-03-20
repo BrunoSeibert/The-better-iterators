@@ -659,7 +659,9 @@ const closeAssistant = () => {
             type="button"
             onClick={() => updateLevel('reset')}
             disabled={levelLoading}
-            className="rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="invisible pointer-events-none rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm font-medium text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-hidden="true"
+            tabIndex={-1}
           >
             Reset Level
           </button>

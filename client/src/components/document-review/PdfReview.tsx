@@ -23,11 +23,11 @@ const applyPageHighlights = (
 ) => {
   const textLayer = pageRoot?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
 
-  if (!textLayer || !pageModel) {
+  if (!pageRoot || !textLayer || !pageModel) {
     return;
   }
 
-  applyHighlightsToContainer(textLayer, wordAnnotations, pageModel.wordStartIndex, documentModel);
+  applyHighlightsToContainer(pageRoot, wordAnnotations, pageModel.wordStartIndex, documentModel);
 };
 
 export default function PdfReview({ document, availableWidth }: PdfReviewProps) {
@@ -102,9 +102,8 @@ function PdfReviewPage({
 
   useEffect(() => {
     return () => {
-      const textLayer = pageRootRef.current?.querySelector<HTMLElement>('.react-pdf__Page__textContent');
-      if (textLayer) {
-        clearReviewAnnotations(textLayer);
+      if (pageRootRef.current) {
+        clearReviewAnnotations(pageRootRef.current);
       }
     };
   }, []);

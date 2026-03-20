@@ -157,8 +157,12 @@ export default function ThesisPresentationTestMode() {
   const [sessionWarning, setSessionWarning] = useState<string | null>(null);
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [listeningDotCount, setListeningDotCount] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const sessionStartAtRef = useRef<number | null>(null);
   const transcriptionBoundaryRef = useRef<number | null>(null);
   const transcriptIdRef = useRef(0);
@@ -178,6 +182,15 @@ export default function ThesisPresentationTestMode() {
     () => Math.max(1, Math.ceil(totalSessionSeconds / selectedIntervalSeconds)),
     [selectedIntervalSeconds, totalSessionSeconds]
   );
+  const soundwaveBars = useMemo(() => {
+    const weights = [0.3, 0.42, 0.56, 0.72, 0.88, 1, 0.88, 0.72, 0.56, 0.42, 0.3];
+    const baseHeight = 8;
+
+    return weights.map((weight, index) => ({
+      id: index,
+      height: Math.round(baseHeight + audioLevel * 62 * weight),
+    }));
+  }, [audioLevel]);
 
   const clearTimerInterval = useCallback(() => {
     if (timerIntervalRef.current !== null) {
@@ -186,10 +199,27 @@ export default function ThesisPresentationTestMode() {
     }
   }, []);
 
+  const stopAudioLevelTracking = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    analyserRef.current = null;
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    setAudioLevel(0);
+  }, []);
+
   const stopTracks = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-  }, []);
+    stopAudioLevelTracking();
+  }, [stopAudioLevelTracking]);
 
   const resetSession = useCallback(() => {
     clearTimerInterval();
@@ -282,10 +312,37 @@ export default function ThesisPresentationTestMode() {
     const mediaRecorder = mimeType
       ? new MediaRecorder(stream, { mimeType })
       : new MediaRecorder(stream);
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.18;
+    source.connect(analyser);
+
+    const amplitudeData = new Uint8Array(analyser.fftSize);
+
+    const updateAudioLevel = () => {
+      analyser.getByteTimeDomainData(amplitudeData);
+
+      let sumSquares = 0;
+      for (let index = 0; index < amplitudeData.length; index += 1) {
+        const sample = (amplitudeData[index] - 128) / 128;
+        sumSquares += sample * sample;
+      }
+
+      const rms = Math.sqrt(sumSquares / amplitudeData.length);
+      const normalizedLevel = Math.min(1, rms * 9.5);
+      setAudioLevel((currentLevel) => currentLevel * 0.12 + normalizedLevel * 0.88);
+      animationFrameRef.current = window.requestAnimationFrame(updateAudioLevel);
+    };
 
     streamRef.current = stream;
     mediaRecorderRef.current = mediaRecorder;
+    audioContextRef.current = audioContext;
+    analyserRef.current = analyser;
     transcriptionBoundaryRef.current = Date.now();
+    animationFrameRef.current = window.requestAnimationFrame(updateAudioLevel);
 
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size === 0) {
@@ -549,12 +606,22 @@ export default function ThesisPresentationTestMode() {
   if (sessionState === 'running') {
     return (
       <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md bg-neutral-100 px-5 py-5 text-neutral-900">
-
         <div className="relative flex items-start justify-between gap-4">
           <div className="rounded-md border border-neutral-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
             <p className="text-sm text-neutral-500">
               Question {Math.min(currentQuestionIndex + 1, questions.length)}/{questions.length}
             </p>
+          </div>
+          <div className="flex flex-1 items-start justify-center pt-9">
+            <div className="flex h-12 items-end gap-1">
+              {soundwaveBars.map((bar) => (
+                <span
+                  key={bar.id}
+                  className="block w-1.5 bg-neutral-900 transition-[height] duration-50 linear"
+                  style={{ height: `${bar.height}px` }}
+                />
+              ))}
+            </div>
           </div>
           <div className="rounded-md border border-neutral-200 bg-white/95 px-4 py-3 text-right shadow-sm backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
@@ -587,9 +654,6 @@ export default function ThesisPresentationTestMode() {
             Stop Session
           </button>
         </div>
-        {sessionWarning && (
-          <p className="mt-2 text-xs text-amber-600">{sessionWarning}</p>
-        )}
       </div>
     );
   }
