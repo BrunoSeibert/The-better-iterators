@@ -62,14 +62,8 @@ export default function AiAssistant() {
     } catch { return undefined; }
   };
 
-  const playAffirmation = useCallback((content: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(content);
-    utterance.rate = 1;
-    utterance.pitch = 1.02;
-    window.speechSynthesis.speak(utterance);
+  const playAffirmation = useCallback((_content: string) => {
+    // speech synthesis removed
   }, []);
 
   const fetchAffirmation = useCallback(async () => {
