@@ -291,7 +291,7 @@ export default function Level2() {
 
       <div className="flex min-h-0 flex-1 gap-3">
         <div
-          className="relative min-w-0 flex-1 overflow-hidden rounded-none"
+          className="relative min-w-0 flex-1 overflow-hidden rounded-lg"
           style={{ border: `3px solid ${C.border}`, isolation: 'isolate' }}
         >
           <div ref={containerRef} className="absolute inset-0 leaflet-container" />
