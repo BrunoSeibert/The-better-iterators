@@ -16,6 +16,107 @@ function save(key: string, value: unknown) {
   try { sessionStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+function renderInlineFormatting(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={index} className="font-semibold text-neutral-900">{part.slice(2, -2)}</strong>;
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function renderProposalBody(body: string) {
+  const lines = body.split(/\r?\n/);
+  const blocks: Array<{ type: 'p' | 'h2' | 'h3' | 'ul'; content: string | string[] }> = [];
+  const paragraphLines: string[] = [];
+  const listItems: string[] = [];
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    blocks.push({ type: 'p', content: paragraphLines.join(' ') });
+    paragraphLines.length = 0;
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push({ type: 'ul', content: [...listItems] });
+    listItems.length = 0;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    if (line.startsWith('### ')) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: 'h3', content: line.slice(4).trim() });
+      return;
+    }
+
+    if (line.startsWith('## ')) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: 'h2', content: line.slice(3).trim() });
+      return;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      flushParagraph();
+      listItems.push(line.replace(/^[-*]\s+/, '').trim());
+      return;
+    }
+
+    flushList();
+    paragraphLines.push(line);
+  });
+
+  flushParagraph();
+  flushList();
+
+  return blocks.map((block, index) => {
+    if (block.type === 'h2') {
+      return (
+        <h4 key={index} className="mt-6 text-base font-semibold text-neutral-900 first:mt-0">
+          {renderInlineFormatting(block.content as string)}
+        </h4>
+      );
+    }
+
+    if (block.type === 'h3') {
+      return (
+        <h5 key={index} className="mt-4 text-sm font-semibold uppercase tracking-wide text-neutral-700 first:mt-0">
+          {renderInlineFormatting(block.content as string)}
+        </h5>
+      );
+    }
+
+    if (block.type === 'ul') {
+      return (
+        <ul key={index} className="my-3 list-disc space-y-1 pl-5">
+          {(block.content as string[]).map((item, itemIndex) => (
+            <li key={itemIndex}>{renderInlineFormatting(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    return (
+      <p key={index} className="my-3 leading-7 first:mt-0 last:mb-0">
+        {renderInlineFormatting(block.content as string)}
+      </p>
+    );
+  });
+}
+
 // ── types ────────────────────────────────────────────────────────────────────
 type FeedbackEntry = {
   role: 'ai' | 'user';
@@ -306,8 +407,8 @@ export default function ResearchProposal({ onMarkComplete }: { onMarkComplete?: 
           <div className="flex flex-col gap-4">
             <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-neutral-900 mb-4">{state.finalProposal.title}</h3>
-              <div className="prose prose-sm max-w-none text-neutral-700 whitespace-pre-wrap">
-                {state.finalProposal.body}
+              <div className="prose prose-sm max-w-none text-neutral-700">
+                {renderProposalBody(state.finalProposal.body)}
               </div>
             </div>
             <div className="flex gap-3">
